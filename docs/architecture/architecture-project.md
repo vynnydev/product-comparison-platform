@@ -70,8 +70,8 @@ product-comparison-api/
 │           ├── ProductServiceTest.java              # Testes unitários Use Cases
 │           └── ProductControllerIntegrationTest.java # Testes de integração
 │
-├── pom.xml
-├── Dockerfile
-├── docker-compose.yml
-├── .gitignore
-└── README.md
+├ pom.xml
+├ Dockerfile
+├ docker-compose.yml
+├ .gitignore
+└ README.md
