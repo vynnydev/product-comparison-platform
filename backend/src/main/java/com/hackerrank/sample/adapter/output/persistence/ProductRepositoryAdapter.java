@@ -3,7 +3,7 @@ package com.hackerrank.sample.adapter.output.persistence;
 import com.hackerrank.sample.adapter.mapper.ProductMapper;
 import com.hackerrank.sample.adapter.output.persistence.entity.ProductEntity;
 import com.hackerrank.sample.domain.model.Product;
-import com.hackerrank.sample.domain.repository.ProductRepository;
+import com.hackerrank.sample.domain.repository.IProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +20,7 @@ import java.util.Optional;
  * It translates between Domain objects and JPA entities.
  */
 @Component
-public class ProductRepositoryAdapter implements ProductRepository {
+public class ProductRepositoryAdapter implements IProductRepository {
     
     private final ProductJpaRepository jpaRepository;
     
