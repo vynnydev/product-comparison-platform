@@ -1,7 +1,7 @@
 package com.hackerrank.sample.usecase;
 
 import com.hackerrank.sample.domain.model.Product;
-import com.hackerrank.sample.domain.repository.IIProductRepository;
+import com.hackerrank.sample.domain.repository.IProductRepository;
 import com.hackerrank.sample.domain.exception.DuplicateProductException;
 import com.hackerrank.sample.domain.exception.InvalidProductException;
 
@@ -30,8 +30,8 @@ public class CreateProductUseCase {
         }
         
         // Business rule: Check for duplicates
-        if (productRepository.existsByName(product.getName())) {
-            throw new DuplicateProductException(product.getName());
+        if (product.getName() != null && productRepository.existsByName(product.getName().getValue())) {
+            throw new DuplicateProductException(product.getName().getValue());
         }
         
         if (product.getId() != null && productRepository.existsById(product.getId())) {

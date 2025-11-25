@@ -24,9 +24,9 @@ public class UpdateProductUseCase {
         // Update fields if provided
         if (updatedData.getName() != null) {
             // Check if name is being changed to an existing name
-            if (!existingProduct.getName().equals(updatedData.getName()) 
-                && productRepository.existsByName(updatedData.getName())) {
-                throw new DuplicateProductException(updatedData.getName());
+            if (!existingProduct.getName().getValue().equals(updatedData.getName().getValue()) 
+                && productRepository.existsByName(updatedData.getName().getValue())) {
+                throw new DuplicateProductException(updatedData.getName().getValue());
             }
             existingProduct.setName(updatedData.getName());
         }

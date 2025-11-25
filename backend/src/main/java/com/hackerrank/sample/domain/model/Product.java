@@ -28,8 +28,8 @@ public class Product {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // Private constructor for controlled creation
-    private Product() {
+    // Public constructor for controlled creation
+    public Product() {
         this.specifications = new HashMap<>();
         this.inStock = true;
         this.rating = Rating.zero();
