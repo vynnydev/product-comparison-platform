@@ -35,8 +35,6 @@
 - [Features](#-features)
 - [System Architecture](#-system-architecture)
   - [Docker Compose (Development)](#docker-compose-architecture)
-  - [AWS Cloud (Production)](#aws-cloud-architecture)
-  - [DevSecOps Pipeline](#devsecops-pipeline)
 - [Microservices Architecture](#-microservices-architecture)
   - [Product Service](#product-service-architecture)
   - [AI Service](#ai-service-architecture)
@@ -46,7 +44,6 @@
 - [Testing](#-testing)
 - [Deployment](#-deployment)
   - [Local (Docker Compose)](#local-development)
-  - [Production (AWS EKS)](#production-aws-eks)
 - [Project Structure](#-project-structure)
 - [Contributing](#-contributing)
 - [License](#-license)
@@ -119,7 +116,6 @@ http://localhost:8080  # Product Service API
 http://localhost:8081  # AI Service API
 http://localhost:15672 # RabbitMQ Management (guest/guest)
 ```
-
 ---
 
 ## 🔬 Microservices Architecture
@@ -410,37 +406,6 @@ docker-compose down
 
 # Clean everything
 docker-compose down -v
-```
-
----
-
-### Production (AWS EKS)
-
-**Quick Overview:**
-```bash
-# 1. Provision infrastructure with Terraform
-cd infrastructure/terraform
-terraform init
-terraform plan
-terraform apply
-
-# 2. Deploy applications with ArgoCD
-kubectl apply -f infrastructure/k8s/argocd/
-
-# 3. Sync applications
-argocd app sync product-service
-argocd app sync ai-service
-```
-
-**Infrastructure Components:**
-```
-✅ VPC (10.0.0.0/16)
-✅ EKS Cluster (2 AZs)
-✅ Amazon MQ (RabbitMQ Multi-AZ)
-✅ RDS PostgreSQL (Multi-AZ + Read Replicas)
-✅ Application Load Balancer
-✅ ECR Repositories
-✅ CloudWatch Logging
 ```
 
 ---
