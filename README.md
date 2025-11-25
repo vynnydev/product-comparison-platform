@@ -1,5 +1,10 @@
 # Product Comparison Platform
 
+<div align="center">
+
+> ⚠️ **Looking for advanced features?** Check out the [`improvement`](../../tree/improvement) branch for AWS EKS deployment, Terraform IaC, and production-ready infrastructure!
+
+<br/>
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2.0-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
@@ -48,7 +53,44 @@
 
 ---
 
+## 🎯 Overview
 
+**Product Comparison Platform** is a production-ready, event-driven microservices platform designed for e-commerce product analysis and comparison. Built with **Clean Architecture** principles, the system leverages **AI-powered insights** using AWS Bedrock (Claude 4.5) to deliver intelligent product recommendations.
+
+### 🌟 Key Highlights
+```
+✅ Event-Driven Architecture    → RabbitMQ message broker with async processing
+✅ Clean Architecture           → Domain-centric design, framework-independent
+✅ Microservices Pattern        → 2 independent services with clear boundaries
+✅ AI Integration               → AWS Bedrock Claude 4.5 for product analysis
+✅ DevSecOps Ready              → GitHub Actions, Trivy, SonarQube, ArgoCD
+✅ Cloud Native                 → Kubernetes/EKS deployment with Terraform IaC
+✅ Production Ready             → Multi-AZ, auto-scaling, monitoring, backup
+```
+
+---
+
+## ✨ Features
+
+### Core Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| 🛍️ **Product Management** | Full CRUD operations with REST API |
+| 🤖 **AI-Powered Analysis** | Automatic product insights via AWS Bedrock |
+| 🔍 **Advanced Search** | Filter by category, price range, ratings |
+| 📊 **Product Comparison** | Side-by-side comparison with AI recommendations |
+| 📨 **Event-Driven** | Async processing with RabbitMQ messaging |
+| 🔄 **Real-time Updates** | Product changes trigger automatic AI analysis |
+
+### Technical Features
+```
+🏗️  Clean Architecture        📦 Value Objects (Money, Rating)
+🎯  SOLID Principles          🔌 Repository Pattern
+📡  Event-Driven Messaging    🐳 Docker Compose support
+☸️  Kubernetes Ready          🧪 Comprehensive test coverage
+🔐  Input Validation          📖 OpenAPI/Swagger docs
+```
 
 ---
 
@@ -77,73 +119,6 @@ http://localhost:8080  # Product Service API
 http://localhost:8081  # AI Service API
 http://localhost:15672 # RabbitMQ Management (guest/guest)
 ```
-
----
-
-### AWS Cloud Architecture
-
-**Production Environment** - Scalable, highly available deployment on AWS
-
-![AWS Cloud Architecture](./docs/architecture/images/aws-cloud-architecture-prod-comp-plat.png)
-
-**Infrastructure:**
-- **Amazon EKS** - Kubernetes cluster (v1.28) across 2 AZs
-- **Amazon MQ** - Managed RabbitMQ (Multi-AZ)
-- **Amazon RDS** - PostgreSQL 15 (Multi-AZ, Read Replicas)
-- **Amazon ECR** - Container image registry
-- **AWS Bedrock** - Claude 4.5 Sonnet for AI analysis
-- **Application Load Balancer** - Traffic distribution
-- **CloudWatch** - Logs, metrics, and monitoring
-
-**High Availability:**
-```
-✅ Multi-AZ deployment (1a, 1b)
-✅ Auto-scaling: Product Service (3 replicas), AI Service (2 replicas)
-✅ RDS automated backups + read replicas
-✅ Health checks + graceful shutdown
-```
-
-> 📖 **Full AWS deployment guide available in [`improvement`](../../tree/improvement) branch**
-
----
-
-### DevSecOps Pipeline
-
-**CI/CD & Infrastructure as Code**
-
-![DevSecOps Pipeline](./docs/architecture/images/devsecops-pipeline.png)
-
-**Pipeline Flow:**
-```mermaid
-graph LR
-    A[GitHub] --> B[GitHub Actions]
-    B --> C[Trivy Security Scan]
-    C --> D[SonarQube Code Quality]
-    D --> E[Docker Build]
-    E --> F[Push to ECR]
-    F --> G[ArgoCD GitOps Deploy]
-    G --> H[EKS Cluster]
-```
-
-**Tools:**
-
-| Stage | Tool | Purpose |
-|-------|------|---------|
-| 🔧 **Source Control** | GitHub | Version control, triggers |
-| ⚡ **CI/CD** | GitHub Actions | Build, test, deploy automation |
-| 🛡️ **Security Scan** | Trivy | Container vulnerability scanning |
-| 📊 **Code Quality** | SonarQube | Static analysis, code coverage |
-| 🏗️ **Infrastructure** | Terraform | IaC for AWS resources |
-| 🔄 **GitOps Deploy** | ArgoCD | Kubernetes deployment sync |
-| 📦 **Registry** | Amazon ECR | Docker image storage |
-
-**Pipelines:**
-
-1. **Infrastructure Pipeline** (Terraform)
-   - Init → Validate → Plan → Apply → Provision AWS resources
-
-2. **Application Pipeline** (Microservices)
-   - Build → Security Scan → Docker Build → Push ECR → Deploy via ArgoCD
 
 ---
 
@@ -441,8 +416,6 @@ docker-compose down -v
 
 ### Production (AWS EKS)
 
-> 📖 **Complete guide available in [`improvement`](../../tree/improvement) branch**
-
 **Quick Overview:**
 ```bash
 # 1. Provision infrastructure with Terraform
@@ -511,7 +484,7 @@ product-comparison-platform/
 │   │
 │   └── docker-compose.yaml             # Local environment
 │
-├── infrastructure/                      # 🏗️ IaC (improvement branch)
+├── infrastructure/                    
 │   ├── terraform/
 │   │   ├── modules/
 │   │   │   ├── vpc/
