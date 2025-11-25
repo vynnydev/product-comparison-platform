@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="Product Comparison API Flow" id="api-flow">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="Product Comparison API - Request Flow" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=28;fontStyle=1;fontColor=#2C3E50;" vertex="1" parent="1">
+          <mxGeometry x="400" y="30" width="600" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Client -->
+        <mxCell id="client" value="👤 CLIENT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#8E24AA;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="120" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- HTTP Request -->
+        <mxCell id="http-req" value="HTTP Request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#FF6B6B;fontSize=14;fontStyle=1;" edge="1" parent="1" source="client" target="controller">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280" y="150" as="sourcePoint" />
+            <mxPoint x="460" y="150" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="http-method" value="POST /api/products" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;fontColor=#D32F2F;fontStyle=1;labelBackgroundColor=#FFF;" vertex="1" connectable="0" parent="http-req">
+          <mxGeometry x="-0.2" y="2" relative="1" as="geometry">
+            <mxPoint x="20" y="-12" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Controller Layer -->
+        <mxCell id="controller" value="ProductController" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE082;strokeColor=#F57C00;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="120" width="180" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="controller-desc" value="@RestController&#xa;Receives HTTP request&#xa;Validates input" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fontColor=#555;" vertex="1" parent="1">
+          <mxGeometry x="465" y="185" width="170" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Mapper -->
+        <mxCell id="mapper-arrow" value="DTO → Domain" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#4CAF50;fontSize=12;fontStyle=1;" edge="1" parent="1" source="controller" target="mapper">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="180" as="sourcePoint" />
+            <mxPoint x="550" y="260" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="mapper" value="ProductMapper" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B3E5FC;strokeColor=#0288D1;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="260" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Use Case -->
+        <mxCell id="usecase-arrow" value="execute()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#8E24AA;fontSize=12;fontStyle=1;" edge="1" parent="1" source="mapper" target="usecase">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="310" as="sourcePoint" />
+            <mxPoint x="550" y="380" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="usecase" value="CreateProductUseCase" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5E1A5;strokeColor=#689F38;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="380" width="180" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="usecase-desc" value="Business Logic:&#xa;• Validate product&#xa;• Check duplicates&#xa;• Apply business rules" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fontColor=#555;" vertex="1" parent="1">
+          <mxGeometry x="465" y="445" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Domain Entity -->
+        <mxCell id="domain-arrow" value="validate()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#E91E63;fontSize=12;fontStyle=1;dashed=1;dashPattern=8 8;" edge="1" parent="1" source="usecase" target="domain">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="640" y="410" as="sourcePoint" />
+            <mxPoint x="800" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="domain" value="Product&#xa;(Domain Entity)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCCBC;strokeColor=#E64A19;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="380" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="domain-desc" value="Value Objects:&#xa;• Money&#xa;• Rating&#xa;• ProductName" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fontColor=#555;" vertex="1" parent="1">
+          <mxGeometry x="805" y="445" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Repository -->
+        <mxCell id="repo-arrow" value="save()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#2196F3;fontSize=12;fontStyle=1;" edge="1" parent="1" source="usecase" target="repository">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="440" as="sourcePoint" />
+            <mxPoint x="550" y="540" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="repository" value="ProductRepository&#xa;(Port - Interface)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1C4E9;strokeColor=#673AB7;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="540" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Adapter -->
+        <mxCell id="adapter-arrow" value="implements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#009688;fontSize=12;fontStyle=1;dashed=1;" edge="1" parent="1" source="repository" target="adapter">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="600" as="sourcePoint" />
+            <mxPoint x="550" y="670" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="adapter" value="ProductRepositoryAdapter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B2DFDB;strokeColor=#00796B;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="670" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- JPA -->
+        <mxCell id="jpa-arrow" value="JPA/Hibernate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#FF9800;fontSize=12;fontStyle=1;" edge="1" parent="1" source="adapter" target="jpa">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="720" as="sourcePoint" />
+            <mxPoint x="550" y="780" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="jpa" value="ProductJpaRepository&#xa;(Spring Data JPA)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F57F17;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="780" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Database -->
+        <mxCell id="db-arrow" value="SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#D32F2F;fontSize=12;fontStyle=1;" edge="1" parent="1" source="jpa" target="database">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280" y="810" as="sourcePoint" />
+            <mxPoint x="100" y="810" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="database" value="🗄️ H2 Database" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#FFCDD2;strokeColor=#C62828;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="760" width="140" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="db-desc" value="Tables:&#xa;• products&#xa;• product_specifications" style="text;html=1;align=left;verticalAlign=top;fontSize=10;fontColor=#555;" vertex="1" parent="1">
+          <mxGeometry x="125" y="865" width="130" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Response Flow -->
+        <mxCell id="response-arrow" value="HTTP 201 Created + Product JSON" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#4CAF50;fontSize=14;fontStyle=1;dashed=1;dashPattern=12 12;" edge="1" parent="1" source="database" target="client">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="190" y="760" as="sourcePoint" />
+            <mxPoint x="190" y="180" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="190" y="700" />
+              <mxPoint x="100" y="700" />
+              <mxPoint x="100" y="150" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend-box" value="LEGEND" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666;fontSize=14;fontStyle=1;align=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="120" width="280" height="320" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE082;strokeColor=#F57C00;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="160" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1-text" value="REST Controller (Input Adapter)" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="163" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C5E1A5;strokeColor=#689F38;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="200" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2-text" value="Use Case (Application Logic)" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="203" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCCBC;strokeColor=#E64A19;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="240" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3-text" value="Domain Entity" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="243" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1C4E9;strokeColor=#673AB7;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="280" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4-text" value="Repository Port (Interface)" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="283" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B2DFDB;strokeColor=#00796B;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="320" width="30" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5-text" value="Adapter (Implementation)" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="323" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg6" value="" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=5;fillColor=#FFCDD2;strokeColor=#C62828;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="360" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6-text" value="Database" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="365" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg7" value="" style="edgeStyle=none;rounded=0;html=1;strokeWidth=2;strokeColor=#FF6B6B;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1070" y="410" as="sourcePoint" />
+            <mxPoint x="1100" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg7-text" value="Request Flow" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="400" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Flow Steps Box -->
+        <mxCell id="steps-box" value="REQUEST FLOW STEPS" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#4CAF50;fontSize=14;fontStyle=1;align=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="470" width="280" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step1" value="1️⃣ Client sends HTTP POST request" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="510" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step2" value="2️⃣ Controller receives and validates input" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="550" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step3" value="3️⃣ Mapper converts DTO → Domain" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="590" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step4" value="4️⃣ Use Case executes business logic" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="630" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step5" value="5️⃣ Domain Entity validates itself" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="670" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step6" value="6️⃣ Repository saves to database" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="710" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step7" value="7️⃣ Adapter converts Domain → Entity" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="750" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step8" value="8️⃣ JPA persists to H2 database" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="790" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="step9" value="9️⃣ Response flows back through layers" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="1065" y="830" width="250" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Footer -->
+        <mxCell id="footer" value="Product Comparison API | Clean Architecture | Domain-Driven Design | SOLID Principles" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="100" y="920" width="1230" height="30" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
