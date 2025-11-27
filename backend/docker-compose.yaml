@@ -1,0 +1,118 @@
+services:
+  # PostgreSQL Database - ARM64 optimized
+  postgres:
+    image: postgres:15-alpine
+    platform: linux/arm64
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data:rw,noexec,nosuid,size=512m
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    shm_size: 128mb
+
+  # Create databases - SINTAXE CORRETA POSTGRESQL
+  postgres-init:
+    image: postgres:15-alpine
+    platform: linux/arm64
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: "no"
+    environment:
+      PGPASSWORD: postgres
+    command: >
+      sh -c "
+      psql -h postgres -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname = 'productdb'\" | grep -q 1 || psql -h postgres -U postgres -c 'CREATE DATABASE productdb;' &&
+      psql -h postgres -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname = 'aidb'\" | grep -q 1 || psql -h postgres -U postgres -c 'CREATE DATABASE aidb;'
+      "
+
+  # RabbitMQ - ARM64
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    platform: linux/arm64
+    container_name: rabbitmq-broker
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    tmpfs:
+      - /var/lib/rabbitmq:rw,noexec,nosuid,size=256m
+    networks:
+      - microservices-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Product Service
+  product-service:
+    build:
+      context: ./services/product-service
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+    container_name: product-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: on-failure
+
+  # AI Service
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+    container_name: ai-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      AI_PROVIDER: mock
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: on-failure
+
+networks:
+  microservices-network:
+    driver: bridge

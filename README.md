@@ -1,19 +1,23 @@
-# Product Comparison Platform - Backend API
+# Product Comparison Platform
 
-<div align="center">
+![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2.0-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.12-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-24.0-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-![Java](https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=openjdk&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.0-brightgreen?style=for-the-badge&logo=spring-boot)
-![Clean Architecture](https://img.shields.io/badge/Architecture-Clean-blue?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
-
+![Clean Architecture](https://img.shields.io/badge/Architecture-Clean-blue?style=flat-square)
+![Event Driven](https://img.shields.io/badge/Pattern-Event--Driven-purple?style=flat-square)
+![Microservices](https://img.shields.io/badge/Architecture-Microservices-orange?style=flat-square)
 ![Build](https://img.shields.io/badge/Build-Passing-success?style=flat-square)
 ![Coverage](https://img.shields.io/badge/Coverage-85%25-green?style=flat-square)
-![Version](https://img.shields.io/badge/Version-1.0.0-blue?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
-**Enterprise-grade RESTful API built with Clean Architecture, SOLID principles, and DDD patterns**
+**Enterprise-grade Event-Driven Microservices Platform with AI Integration**
 
-[Features](#-features) • [Architecture](#-architecture) • [Getting Started](#-getting-started) • [API Documentation](#-api-documentation) • [Tech Stack](#-tech-stack)
+*Clean Architecture • SOLID Principles • Domain-Driven Design • Event-Driven Architecture*
+
+[Features](#-features) • [Architecture](#-architecture) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Deployment](#-deployment)
 
 </div>
 
@@ -21,315 +25,386 @@
 
 ## 📋 Table of Contents
 
-- [About](#-about)
+- [Overview](#-overview)
 - [Features](#-features)
-- [Architecture](#-architecture)
+- [System Architecture](#-system-architecture)
+  - [Docker Compose (Development)](#docker-compose-architecture)
+  - [AWS Cloud (Production)](#aws-cloud-architecture)
+  - [DevSecOps Pipeline](#devsecops-pipeline)
+- [Microservices Architecture](#-microservices-architecture)
+  - [Product Service](#product-service-architecture)
+  - [AI Service](#ai-service-architecture)
 - [Tech Stack](#-tech-stack)
-- [Getting Started](#-getting-started)
+- [Quick Start](#-quick-start)
 - [API Documentation](#-api-documentation)
-- [Database](#-database)
 - [Testing](#-testing)
+- [Deployment](#-deployment)
+  - [Local (Docker Compose)](#local-development)
+  - [Production (AWS EKS)](#production-aws-eks)
 - [Project Structure](#-project-structure)
-- [Best Practices](#-best-practices)
 - [Contributing](#-contributing)
 - [License](#-license)
 
 ---
 
-## 🎯 About
+## 🎯 Overview
 
-Product Comparison Platform is a modern, scalable backend API designed for e-commerce product comparison features. Built following **Clean Architecture** principles, the system separates business logic from frameworks, ensuring maintainability, testability, and flexibility.
+**Product Comparison Platform** is a production-ready, event-driven microservices platform designed for e-commerce product analysis and comparison. Built with **Clean Architecture** principles, the system leverages **AI-powered insights** using AWS Bedrock (Claude 4.5) to deliver intelligent product recommendations.
 
-### Key Highlights
-
-- ✅ **Clean Architecture** - Domain-centric design with clear separation of concerns
-- ✅ **SOLID Principles** - Every class follows Single Responsibility, Open/Closed, and Dependency Inversion
-- ✅ **DDD Patterns** - Value Objects, Aggregates, and Domain Events
-- ✅ **Layered Design** - Domain → Use Cases → Adapters → Infrastructure
-- ✅ **RESTful API** - Standard HTTP methods, proper status codes, and JSON responses
-- ✅ **Production Ready** - Exception handling, logging, and validation
+### 🌟 Key Highlights
+```
+✅ Event-Driven Architecture    → RabbitMQ message broker with async processing
+✅ Clean Architecture           → Domain-centric design, framework-independent
+✅ Microservices Pattern        → 2 independent services with clear boundaries
+✅ AI Integration               → AWS Bedrock Claude 4.5 for product analysis
+✅ DevSecOps Ready              → GitHub Actions, Trivy, SonarQube, ArgoCD
+✅ Cloud Native                 → Kubernetes/EKS deployment with Terraform IaC
+✅ Production Ready             → Multi-AZ, auto-scaling, monitoring, backup
+```
 
 ---
 
 ## ✨ Features
 
-### Core Functionality
+### Core Capabilities
 
-- 🛍️ **Product Management** - Full CRUD operations for products
-- 🔍 **Advanced Search** - Filter by category, price range, and ratings
-- 📊 **Product Comparison** - Compare multiple products side-by-side
-- 💰 **Price Filtering** - Find products within budget
-- ⭐ **Rating System** - Filter by minimum rating threshold
-- 🏷️ **Category Navigation** - Browse products by category
-- 📝 **Specifications** - Flexible key-value product specifications
-- 🔐 **Input Validation** - Comprehensive validation using Jakarta Bean Validation
+| Feature | Description |
+|---------|-------------|
+| 🛍️ **Product Management** | Full CRUD operations with REST API |
+| 🤖 **AI-Powered Analysis** | Automatic product insights via AWS Bedrock |
+| 🔍 **Advanced Search** | Filter by category, price range, ratings |
+| 📊 **Product Comparison** | Side-by-side comparison with AI recommendations |
+| 📨 **Event-Driven** | Async processing with RabbitMQ messaging |
+| 🔄 **Real-time Updates** | Product changes trigger automatic AI analysis |
 
 ### Technical Features
-
-- 🏗️ **Modular Architecture** - Easy to extend and maintain
-- 📦 **Value Objects** - Money, Rating, and ProductName with built-in validation
-- 🔄 **Repository Pattern** - Clean abstraction over data access
-- 🎯 **Use Case Driven** - Business logic encapsulated in focused use cases
-- 🗺️ **DTOs & Mappers** - Clear boundaries between layers
-- ⚡ **H2 In-Memory DB** - Fast development and testing
-- 📖 **Swagger/OpenAPI** - Interactive API documentation
-- 🧪 **Comprehensive Tests** - Unit and integration tests
+```
+🏗️  Clean Architecture        📦 Value Objects (Money, Rating)
+🎯  SOLID Principles          🔌 Repository Pattern
+📡  Event-Driven Messaging    🐳 Docker Compose support
+☸️  Kubernetes Ready          🧪 Comprehensive test coverage
+🔐  Input Validation          📖 OpenAPI/Swagger docs
+```
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ System Architecture
 
-### Clean Architecture Diagram
+### Docker Compose Architecture
 
-<!-- Adicione aqui a imagem da arquitetura -->
-![API Clean Architecture](./docs/architecture/images/api-clean-architecture-diagram.png)
+**Development Environment** - Run locally with Docker Compose
 
-### Architecture Layers
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    FRAMEWORKS & DRIVERS                     │
-│              Spring Boot, JPA, H2 Database                  │
-├─────────────────────────────────────────────────────────────┤
-│                   INTERFACE ADAPTERS                        │
-│         Controllers, DTOs, Repositories, Mappers            │
-├─────────────────────────────────────────────────────────────┤
-│                 APPLICATION BUSINESS RULES                  │
-│                        Use Cases                            │
-├─────────────────────────────────────────────────────────────┤
-│                ENTERPRISE BUSINESS RULES                    │
-│           Entities, Value Objects, Domain Logic             │
-└─────────────────────────────────────────────────────────────┘
-```
+![Docker Compose Architecture](./docs/architecture/images/docker-comp-architecture-prod-comp-plat.png)
 
-### Dependency Rule
-
-**All dependencies point inward** - Inner circles know nothing about outer circles.
-
-- ✅ Use Cases depend on Domain
-- ✅ Adapters depend on Use Cases
-- ✅ Infrastructure depends on Adapters
-- ❌ Domain NEVER depends on frameworks
-
----
-
-## 🛠️ Tech Stack
-
-### Core Technologies
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **Java** | 21 LTS | Programming Language |
-| **Spring Boot** | 3.2.0 | Application Framework |
-| **Spring Data JPA** | 3.2.0 | Data Access Layer |
-| **Hibernate** | 6.3.1 | ORM Implementation |
-| **H2 Database** | 2.2.224 | In-Memory Database |
-| **Maven** | 3.9+ | Build Tool |
-
-### Libraries & Tools
-
-- **Jakarta Validation** - Bean validation
-- **Springdoc OpenAPI** - API documentation
-- **JUnit 5** - Unit testing
-- **Mockito** - Mocking framework
-- **REST Assured** - API testing
-- **Jackson** - JSON processing
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
+**Components:**
+- **Product Service** (Port 8080) - REST API, Event Publisher
+- **AI Service** (Port 8081) - Event Consumer, AI Analysis
+- **RabbitMQ** (Ports 5672, 15672) - Message Broker
+- **PostgreSQL** - Databases: `productdb`, `aidb`
 ```bash
-# Java 21 or higher
-java --version
-
-# Maven 3.8+
-mvn --version
-```
-
-### Installation
-```bash
-# 1. Clone repository
-git clone https://github.com/your-username/product-comparison-platform.git
-cd product-comparison-platform/backend
-
-# 2. Build project
-mvn clean install
-
-# 3. Run application
-mvn spring-boot:run
-```
-
-### Quick Start (Docker)
-```bash
-# Build and run
+# Start all services
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
 
-# Stop
-docker-compose down
+# Access services
+http://localhost:8080  # Product Service API
+http://localhost:8081  # AI Service API
+http://localhost:15672 # RabbitMQ Management (guest/guest)
 ```
 
-### Access Points
+---
 
-Once running, access:
+### AWS Cloud Architecture
 
-- 🌐 **API Base**: http://localhost:8080/api
-- 📖 **Swagger UI**: http://localhost:8080/swagger-ui.html
-- 🗄️ **H2 Console**: http://localhost:8080/h2-console
-  - JDBC URL: `jdbc:h2:mem:productdb`
-  - Username: `sa`
-  - Password: *(empty)*
+**Production Environment** - Scalable, highly available deployment on AWS
+
+![AWS Cloud Architecture](./docs/architecture/images/aws-cloud-architecture-prod-comp-plat.png)
+
+**Infrastructure:**
+- **Amazon EKS** - Kubernetes cluster (v1.28) across 2 AZs
+- **Amazon MQ** - Managed RabbitMQ (Multi-AZ)
+- **Amazon RDS** - PostgreSQL 15 (Multi-AZ, Read Replicas)
+- **Amazon ECR** - Container image registry
+- **AWS Bedrock** - Claude 4.5 Sonnet for AI analysis
+- **Application Load Balancer** - Traffic distribution
+- **CloudWatch** - Logs, metrics, and monitoring
+
+**High Availability:**
+```
+✅ Multi-AZ deployment (1a, 1b)
+✅ Auto-scaling: Product Service (3 replicas), AI Service (2 replicas)
+✅ RDS automated backups + read replicas
+✅ Health checks + graceful shutdown
+```
+
+---
+
+### DevSecOps Pipeline
+
+**CI/CD & Infrastructure as Code**
+
+![DevSecOps Pipeline](./docs/architecture/images/devsecops-pipeline.png)
+
+**Pipeline Flow:**
+```mermaid
+graph LR
+    A[GitHub] --> B[GitHub Actions]
+    B --> C[Trivy Security Scan]
+    C --> D[SonarQube Code Quality]
+    D --> E[Docker Build]
+    E --> F[Push to ECR]
+    F --> G[ArgoCD GitOps Deploy]
+    G --> H[EKS Cluster]
+```
+
+**Tools:**
+
+| Stage | Tool | Purpose |
+|-------|------|---------|
+| 🔧 **Source Control** | GitHub | Version control, triggers |
+| ⚡ **CI/CD** | GitHub Actions | Build, test, deploy automation |
+| 🛡️ **Security Scan** | Trivy | Container vulnerability scanning |
+| 📊 **Code Quality** | SonarQube | Static analysis, code coverage |
+| 🏗️ **Infrastructure** | Terraform | IaC for AWS resources |
+| 🔄 **GitOps Deploy** | ArgoCD | Kubernetes deployment sync |
+| 📦 **Registry** | Amazon ECR | Docker image storage |
+
+**Pipelines:**
+
+1. **Infrastructure Pipeline** (Terraform)
+   - Init → Validate → Plan → Apply → Provision AWS resources
+
+2. **Application Pipeline** (Microservices)
+   - Build → Security Scan → Docker Build → Push ECR → Deploy via ArgoCD
+
+---
+
+## 🔬 Microservices Architecture
+
+### Product Service Architecture
+
+**Request Flow** - HTTP REST API with Clean Architecture
+
+![Product Service Architecture](./docs/architecture/images/product-service-architecture.png)
+
+**Flow:**
+```
+1️⃣ Client sends HTTP POST request
+2️⃣ ProductController receives and validates input
+3️⃣ ProductMapper converts DTO → Domain
+4️⃣ CreateProductUseCase executes business logic
+5️⃣ Product Entity validates itself (Value Objects)
+6️⃣ ProductRepository saves to database
+7️⃣ ProductRepositoryAdapter converts Domain → JPA Entity
+8️⃣ JPA persists to PostgreSQL (productdb)
+9️⃣ **Publishes event** to RabbitMQ (product.created)
+```
+
+**Endpoints:**
+- `POST /api/products` - Create product
+- `GET /api/products` - List products
+- `GET /api/products/{id}` - Get product by ID
+- `PUT /api/products/{id}` - Update product
+- `DELETE /api/products/{id}` - Delete product
+- `GET /api/products/category/{category}` - Filter by category
+- `GET /api/products/search?keyword=x` - Search products
+
+---
+
+### AI Service Architecture
+
+**Event-Driven Flow** - Async AI analysis via RabbitMQ
+
+![AI Service Architecture](./docs/architecture/images/ai-service-architecture.png)
+
+**Flow:**
+```
+1️⃣ Product-Service publishes event to RabbitMQ
+2️⃣ RabbitMQ routes to product.ai.analysis.queue
+3️⃣ ProductEventListener consumes message
+4️⃣ Routes to AnalyzeProductUseCase
+5️⃣ UseCase calls AIService (port)
+6️⃣ LambdaAIAdapter calls AWS Bedrock Claude 4.5
+7️⃣ AI generates analysis & insights (strengths, weaknesses, score)
+8️⃣ Creates ProductAnalysis entity
+9️⃣ AnalysisRepository saves to PostgreSQL (aidb)
+🔟 Analysis available via REST API
+```
+
+**AI Providers:**
+- **Production:** AWS Bedrock Claude 4.5 (`@Profile("cloud")`)
+- **Development:** Mock AI Adapter (`@Profile("mock")`)
+
+**Analysis Output:**
+```json
+{
+  "productId": 1,
+  "analysisText": "High-quality flagship smartphone...",
+  "aiScore": 92,
+  "insights": ["Premium build quality", "Excellent camera"],
+  "strengths": ["Performance", "Design"],
+  "weaknesses": ["Price premium"],
+  "recommendations": ["Best for power users"]
+}
+```
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend Services
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| ☕ **Java** | 21 LTS | Programming language |
+| 🍃 **Spring Boot** | 3.2.0 | Application framework |
+| 🗄️ **Spring Data JPA** | 3.2.0 | Data access layer |
+| 🐰 **RabbitMQ** | 3.12 | Message broker |
+| 🐘 **PostgreSQL** | 15 | Relational database |
+| 🧠 **AWS Bedrock** | Claude 4.5 | AI analysis (production) |
+| 🔨 **Maven** | 3.9+ | Build tool |
+
+### DevOps & Cloud
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| 🐳 **Docker** | 24.0+ | Containerization |
+| ☸️ **Kubernetes** | 1.28 | Container orchestration |
+| 🏗️ **Terraform** | 1.6+ | Infrastructure as Code |
+| ⚡ **GitHub Actions** | - | CI/CD pipeline |
+| 🔄 **ArgoCD** | 2.9+ | GitOps deployment |
+| 🛡️ **Trivy** | Latest | Security scanning |
+| 📊 **SonarQube** | 10.3+ | Code quality |
+| ☁️ **AWS** | - | Cloud provider (EKS, RDS, MQ, Bedrock) |
+
+### Testing & Documentation
+```
+🧪 JUnit 5             📖 Springdoc OpenAPI
+🎭 Mockito             📝 Swagger UI
+✅ REST Assured         🔍 Jacoco (Coverage)
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+```bash
+# Required
+Java 21+
+Maven 3.9+
+Docker & Docker Compose
+
+# Check versions
+java --version
+mvn --version
+docker --version
+docker-compose --version
+```
+
+### Local Development (Docker Compose)
+```bash
+# 1. Clone repository
+git clone https://github.com/vynnydev/product-comparison-platform.git
+cd product-comparison-platform
+
+# 2. Start all services
+docker-compose up -d
+
+# 3. Verify services are running
+docker-compose ps
+
+# 4. View logs
+docker-compose logs -f product-service
+docker-compose logs -f ai-service
+
+# 5. Test the API
+curl http://localhost:8080/api/products
+```
+
+### Service Endpoints
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| 📦 **Product Service** | http://localhost:8080 | - |
+| 🤖 **AI Service** | http://localhost:8081 | - |
+| 📖 **Swagger (Product)** | http://localhost:8080/swagger-ui.html | - |
+| 📖 **Swagger (AI)** | http://localhost:8081/swagger-ui.html | - |
+| 🐰 **RabbitMQ Management** | http://localhost:15672 | guest / guest |
 
 ---
 
 ## 📡 API Documentation
 
-### Swagger UI
+### Product Service API
 
-<!-- Adicione aqui a imagem do Swagger -->
-![Swagger API Documentation API Description](./docs/images/swagger-api-description.png)
-![Swagger API Documentation API Endpoints](./docs/images/swagger-api-endpoints.png)
-
-### Base URL
-```
-http://localhost:8080/api
-```
-
-### Endpoints Overview
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Health check |
-| POST | `/products` | Create product |
-| GET | `/products` | List all products |
-| GET | `/products/{id}` | Get product by ID |
-| PUT | `/products/{id}` | Update product |
-| DELETE | `/products/{id}` | Delete product |
-| DELETE | `/products/erase` | Delete all products |
-| GET | `/products/category/{category}` | Filter by category |
-| GET | `/products/price-range?min=x&max=y` | Filter by price |
-| GET | `/products/rating?min=x` | Filter by rating |
-| GET | `/products/search?keyword=x` | Search by name |
-
-### Sample Requests
+**Base URL:** `http://localhost:8080/api`
 
 #### Create Product
 ```bash
 curl -X POST http://localhost:8080/api/products \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "iPhone 15 Pro Max",
-    "description": "Latest flagship smartphone",
-    "imageUrl": "https://example.com/iphone.jpg",
-    "price": 1199.99,
-    "rating": 4.8,
-    "category": "Smartphones",
+    "name": "MacBook Pro 16 M3 Max",
+    "description": "Powerful laptop for developers",
+    "imageUrl": "https://example.com/macbook.jpg",
+    "price": 3499.99,
+    "rating": 4.9,
+    "category": "Laptops",
     "inStock": true,
     "specifications": {
-      "storage": "256GB",
-      "color": "Titanium Blue",
-      "processor": "A17 Pro"
+      "processor": "M3 Max",
+      "ram": "64GB",
+      "storage": "2TB SSD"
     }
   }'
 ```
 
-#### Get All Products
-```bash
-curl http://localhost:8080/api/products
-```
-
-#### Filter by Category
-```bash
-curl http://localhost:8080/api/products/category/Smartphones
-```
-
-#### Search Products
-```bash
-curl http://localhost:8080/api/products/search?keyword=iPhone
-```
-
-### Response Format
-
-**Success Response:**
+**Response:** `201 Created`
 ```json
 {
   "id": 1,
-  "name": "iPhone 15 Pro Max",
-  "description": "Latest flagship smartphone",
-  "imageUrl": "https://example.com/iphone.jpg",
-  "price": 1199.99,
-  "rating": 4.8,
-  "category": "Smartphones",
-  "inStock": true,
-  "specifications": {
-    "storage": "256GB",
-    "color": "Titanium Blue"
-  },
-  "createdAt": "2024-11-24T20:30:00",
-  "updatedAt": "2024-11-24T20:30:00"
+  "name": "MacBook Pro 16 M3 Max",
+  "price": 3499.99,
+  "rating": 4.9,
+  "createdAt": "2024-11-27T19:00:00"
 }
 ```
 
-**Error Response:**
+> 🎯 **This triggers an event** → AI Service automatically analyzes the product
+
+#### Get AI Analysis
+```bash
+curl http://localhost:8081/api/ai/product/1
+```
+
+**Response:** `200 OK`
 ```json
 {
-  "timestamp": "2024-11-24T20:30:00",
-  "status": 404,
-  "error": "Not Found",
-  "message": "Product with ID 999 not found",
-  "path": "/api/products"
+  "productId": 1,
+  "aiScore": 95,
+  "analysisText": "Premium professional laptop with exceptional performance...",
+  "insights": [
+    "Top-tier M3 Max processor delivers outstanding performance",
+    "64GB RAM ideal for heavy multitasking",
+    "Excellent build quality and design"
+  ],
+  "strengths": ["Performance", "Display", "Build Quality"],
+  "weaknesses": ["High price point", "Limited upgradeability"],
+  "recommendations": ["Best for professional developers and content creators"]
 }
 ```
 
----
+### Interactive API Documentation
 
-## 🗄️ Database
+Access Swagger UI for complete API documentation:
 
-### Schema Overview
+- **Product Service:** http://localhost:8080/swagger-ui.html
+- **AI Service:** http://localhost:8081/swagger-ui.html
 
-<!-- Adicione aqui a imagem do banco -->
-![Database Connection](./docs/images/jdbc-h2-connected.png)
-![Database Schema](./docs/images/h2-tables-and-items-products.png)
-
-### Tables
-
-**products**
-```sql
-CREATE TABLE products (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    description VARCHAR(2000),
-    image_url VARCHAR(255) NOT NULL,
-    price DECIMAL(10,2) NOT NULL,
-    rating DECIMAL(2,1) DEFAULT 0.0,
-    category VARCHAR(255) NOT NULL,
-    in_stock BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP
-);
-```
-
-**product_specifications**
-```sql
-CREATE TABLE product_specifications (
-    product_id BIGINT NOT NULL,
-    spec_key VARCHAR(255),
-    spec_value VARCHAR(500),
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
-);
-```
-
-### Sample Data
-
-The application includes a database seeder with 10+ sample products across 5 categories:
-- 📱 Smartphones (iPhone, Samsung, Google)
-- 💻 Laptops (MacBook, Dell, Lenovo)
-- 📱 Tablets (iPad, Galaxy Tab)
-- 🎧 Headphones (Sony, AirPods)
-- ⌚ Smartwatches (Apple Watch, Garmin)
+![Swagger UI](./docs/images/swagger-api-endpoints.png)
 
 ---
 
@@ -337,177 +412,273 @@ The application includes a database seeder with 10+ sample products across 5 cat
 
 ### Run All Tests
 ```bash
-mvn test
+# Product Service tests
+cd backend/services/product-service
+mvn clean test
+
+# AI Service tests
+cd backend/services/ai-service
+mvn clean test
+
+# Integration tests
+cd backend/scripts/integrated-tests/product-service
+./integrated-tests.sh
 ```
 
 ### Test Coverage
 ```bash
+# Generate coverage report
 mvn clean test jacoco:report
+
+# View report
+open target/site/jacoco/index.html
 ```
 
-View report at: `target/site/jacoco/index.html`
+**Current Coverage:** 85%
 
-### Test Structure
-```
-src/test/java/
-├── ProductServiceTest.java           # Unit tests for business logic
-└── ProductControllerIntegrationTest.java  # Integration tests
+![Test Results](./docs/images/integrated-tests.png)
+
+### Test Event Flow
+```bash
+# Test complete event-driven flow
+cd backend/scripts/messaging
+./demo-events.sh
+
+# Monitor RabbitMQ
+./monitor-rabbitmq.sh
 ```
 
-### Example Test
-```java
-@Test
-@DisplayName("Should create product successfully")
-void testCreateProduct() {
-    // Given
-    Product product = createTestProduct();
-    
-    // When
-    Product result = createProductUseCase.execute(product);
-    
-    // Then
-    assertNotNull(result.getId());
-    assertEquals("iPhone 15 Pro", result.getName());
-}
+![RabbitMQ Events](./docs/images/rabbitmq-messages-events.png)
+
+---
+
+## 🚢 Deployment
+
+### Local Development
+
+**Requirements:** Docker & Docker Compose
+```bash
+# Start services
+docker-compose up -d
+
+# Scale services
+docker-compose up -d --scale product-service=3
+
+# Stop services
+docker-compose down
+
+# Clean everything
+docker-compose down -v
+```
+
+---
+
+### Production (AWS EKS)
+
+**Quick Overview:**
+```bash
+# 1. Provision infrastructure with Terraform
+cd infrastructure/terraform
+terraform init
+terraform plan
+terraform apply
+
+# 2. Deploy applications with ArgoCD
+kubectl apply -f infrastructure/k8s/argocd/
+
+# 3. Sync applications
+argocd app sync product-service
+argocd app sync ai-service
+```
+
+**Infrastructure Components:**
+```
+✅ VPC (10.0.0.0/16)
+✅ EKS Cluster (2 AZs)
+✅ Amazon MQ (RabbitMQ Multi-AZ)
+✅ RDS PostgreSQL (Multi-AZ + Read Replicas)
+✅ Application Load Balancer
+✅ ECR Repositories
+✅ CloudWatch Logging
 ```
 
 ---
 
 ## 📂 Project Structure
+
+### Monorepo Organization
 ```
-backend/
-├── src/
-│   ├── main/
-│   │   ├── java/com/hackerrank/sample/
-│   │   │   ├── domain/                    # 🟡 Enterprise Business Rules
-│   │   │   │   ├── model/
-│   │   │   │   │   └── Product.java      # Aggregate Root
-│   │   │   │   ├── valueobject/
-│   │   │   │   │   ├── Money.java
-│   │   │   │   │   ├── Rating.java
-│   │   │   │   │   └── ProductName.java
-│   │   │   │   ├── repository/
-│   │   │   │   │   └── ProductRepository.java  # Port
-│   │   │   │   └── exception/
-│   │   │   │       └── DomainException.java
-│   │   │   │
-│   │   │   ├── usecase/                   # 🟠 Application Business Rules
-│   │   │   │   ├── CreateProductUseCase.java
-│   │   │   │   ├── GetProductByIdUseCase.java
-│   │   │   │   └── SearchProductsUseCase.java
-│   │   │   │
-│   │   │   ├── adapter/                   # 🟢 Interface Adapters
-│   │   │   │   ├── input/
-│   │   │   │   │   ├── rest/
-│   │   │   │   │   │   └── ProductController.java
-│   │   │   │   │   └── dto/
-│   │   │   │   │       ├── ProductRequestDTO.java
-│   │   │   │   │       └── ProductResponseDTO.java
-│   │   │   │   ├── output/
-│   │   │   │   │   └── persistence/
-│   │   │   │   │       ├── ProductRepositoryAdapter.java
-│   │   │   │   │       └── entity/
-│   │   │   │   │           └── ProductEntity.java
-│   │   │   │   └── mapper/
-│   │   │   │       └── ProductMapper.java
-│   │   │   │
-│   │   │   ├── config/                    # 🔵 Configuration
-│   │   │   │   ├── UseCaseConfiguration.java
-│   │   │   │   └── OpenApiConfig.java
-│   │   │   │
-│   │   │   └── Application.java           # Main
+product-comparison-platform/
+├── backend/
+│   ├── services/
+│   │   ├── product-service/          # 📦 Product Management
+│   │   │   ├── src/
+│   │   │   │   ├── main/java/.../
+│   │   │   │   │   ├── adapter/      # Controllers, DTOs
+│   │   │   │   │   ├── domain/       # Entities, Value Objects
+│   │   │   │   │   ├── usecase/      # Business Logic
+│   │   │   │   │   └── config/       # Spring Config
+│   │   │   │   └── resources/
+│   │   │   ├── Dockerfile
+│   │   │   └── pom.xml
 │   │   │
-│   │   └── resources/
-│   │       └── application.properties
+│   │   └── ai-service/                # 🤖 AI Analysis
+│   │       ├── src/
+│   │       │   ├── main/java/.../
+│   │       │   │   ├── adapter/
+│   │       │   │   │   ├── input/messaging/  # Event Listeners
+│   │       │   │   │   └── output/ai/        # Bedrock/Mock Adapters
+│   │       │   │   ├── domain/
+│   │       │   │   ├── usecase/
+│   │       │   │   └── config/
+│   │       │   └── resources/
+│   │       ├── Dockerfile
+│   │       └── pom.xml
 │   │
-│   └── test/
-│       └── java/com/hackerrank/sample/
-│           ├── ProductServiceTest.java
-│           └── ProductControllerIntegrationTest.java
+│   ├── scripts/
+│   │   ├── messaging/
+│   │   │   ├── demo-events.sh         # Test event flow
+│   │   │   └── monitor-rabbitmq.sh    # Monitor messages
+│   │   └── integrated-tests/          # Integration tests
+│   │
+│   └── docker-compose.yaml             # Local environment
+│
+├── infrastructure/                    
+│   ├── terraform/
+│   │   ├── modules/
+│   │   │   ├── vpc/
+│   │   │   ├── eks/
+│   │   │   ├── rds/
+│   │   │   └── mq/
+│   │   ├── main.tf
+│   │   └── variables.tf
+│   └── scripts/
 │
 ├── docs/
-│   └── images/
-│       ├── clean-architecture-diagram.png
-│       ├── swagger-ui.png
-│       └── database-schema.png
+│   ├── architecture/
+│   │   └── images/                    # Architecture diagrams
+│   └── images/                        # Screenshots
 │
-├── pom.xml
-├── Dockerfile
-├── docker-compose.yml
+├── .github/
+│   └── workflows/
+│       ├── ci-product-service.yml
+│       ├── ci-ai-service.yml
+│       └── terraform.yml
+│
 └── README.md
+```
+
+### Service Architecture (Clean Architecture)
+```
+Each service follows the same structure:
+
+adapter/
+  ├── input/          # REST Controllers, Event Listeners
+  ├── output/         # Repositories, External APIs
+  └── mapper/         # DTOs ↔ Domain conversion
+
+domain/
+  ├── model/          # Entities (Aggregate Roots)
+  ├── valueobject/    # Money, Rating, etc.
+  ├── repository/     # Ports (Interfaces)
+  └── exception/      # Domain exceptions
+
+usecase/              # Application business logic
+  ├── CreateProductUseCase.java
+  ├── AnalyzeProductUseCase.java
+  └── ...
+
+config/               # Spring configuration
 ```
 
 ---
 
 ## 💎 Best Practices
 
-### Clean Architecture
-
-✅ **Domain Independence** - Core business logic has zero framework dependencies  
-✅ **Testability** - Easy to test without mocking frameworks  
-✅ **Flexibility** - Swap frameworks without changing business logic  
-✅ **Maintainability** - Clear separation makes code easy to understand
+### Clean Architecture Principles
+```
+✅ Domain Independence       → Core logic has zero framework dependencies
+✅ Dependency Inversion      → All dependencies point inward
+✅ Testability              → Easy to test without mocking frameworks
+✅ Flexibility              → Swap frameworks without changing business logic
+```
 
 ### SOLID Principles
 
-- **S** - Each class has a single, well-defined responsibility
-- **O** - Code is open for extension, closed for modification
-- **L** - Implementations are interchangeable through interfaces
-- **I** - Interfaces are focused and specific
-- **D** - High-level modules depend on abstractions, not concretions
+| Principle | Implementation |
+|-----------|----------------|
+| **S**ingle Responsibility | Each class has one reason to change |
+| **O**pen/Closed | Open for extension, closed for modification |
+| **L**iskov Substitution | Implementations interchangeable via interfaces |
+| **I**nterface Segregation | Focused, specific interfaces |
+| **D**ependency Inversion | Depend on abstractions, not concretions |
 
-### DDD Patterns
-
-✅ **Entities** - Product as Aggregate Root with business rules  
-✅ **Value Objects** - Money, Rating, ProductName with immutability  
-✅ **Repository Pattern** - Clean abstraction over data access  
-✅ **Domain Events** - Ready for event-driven architecture
-
-### Code Quality
-
-✅ **Meaningful Names** - Clear, intention-revealing names  
-✅ **Small Functions** - Each function does one thing well  
-✅ **Comments** - JavaDoc for all public APIs  
-✅ **Error Handling** - Domain-specific exceptions  
-✅ **No Magic Numbers** - Constants with descriptive names
+### Event-Driven Patterns
+```
+📨 Async Communication     → Services communicate via events
+🔄 Eventual Consistency   → Data synchronized asynchronously
+📊 Event Sourcing Ready   → Events as source of truth
+🎯 Decoupled Services     → Services don't know about each other
+```
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
+Contributions are welcome! Please follow these guidelines:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### Workflow
+```bash
+# 1. Fork the repository
+# 2. Create feature branch
+git checkout -b feature/amazing-feature
+
+# 3. Make changes and test
+mvn clean test
+
+# 4. Commit with conventional commits
+git commit -m "feat: add amazing feature"
+
+# 5. Push and create PR
+git push origin feature/amazing-feature
+```
 
 ### Commit Convention
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
+```
+feat:      New feature
+fix:       Bug fix
+docs:      Documentation changes
+refactor:  Code refactoring (no behavior change)
+test:      Adding or updating tests
+chore:     Maintenance tasks
+ci:        CI/CD changes
+```
 
-- `feat:` - New feature
-- `fix:` - Bug fix
-- `docs:` - Documentation changes
-- `refactor:` - Code refactoring
-- `test:` - Adding tests
-- `chore:` - Maintenance tasks
+### Code Quality
+```bash
+# Run all checks before committing
+mvn clean verify                    # Build + tests
+mvn spotless:check                  # Code formatting
+mvn checkstyle:check               # Style violations
+```
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 👨‍💻 Author
 
-**Vini** - Backend Developer & DevOps Engineer
+**Vinicius Prudencio (Vini)**  
+*Backend Developer & DevOps Engineer*
 
-- 🚀 Specialized in Clean Architecture & Cloud Native Solutions
-- ☁️ AWS Certified | Terraform | Kubernetes | ArgoCD
+- 🚀 Specialized in Clean Architecture & Cloud-Native Solutions
+- ☁️ AWS | Terraform | Kubernetes | ArgoCD | GitHub Actions
 - 💼 [LinkedIn](https://linkedin.com/in/vinicius-prudencio)
 - 🐙 [GitHub](https://github.com/vynnydev)
 
@@ -515,17 +686,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Uncle Bob's Clean Architecture principles
-- Domain-Driven Design by Eric Evans
-- Spring Boot team for the excellent framework
-- Open source community
+- **Uncle Bob** - Clean Architecture principles
+- **Eric Evans** - Domain-Driven Design concepts
+- **Spring Team** - Excellent framework and documentation
+- **AWS** - Cloud infrastructure and AI services
+- **Open Source Community** - Amazing tools and libraries
 
 ---
 
 <div align="center">
 
-**Made with ❤️ using Clean Architecture**
+### 🌟 **Made with ❤️ using Clean Architecture, Event-Driven Design, and AI**
 
-⭐ Star this repo if you found it helpful!
+[![Star this repo](https://img.shields.io/github/stars/vynnydev/product-comparison-platform?style=social)](https://github.com/vynnydev/product-comparison-platform)
+
+**If you found this helpful, please ⭐ star the repository!**
+
+---
+
+**Branches:**
+- `main` / `develop` - Docker Compose (Local Development)
+- `improvement` - AWS EKS + Terraform (Production Ready)
 
 </div>

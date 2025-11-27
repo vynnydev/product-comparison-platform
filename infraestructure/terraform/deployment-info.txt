@@ -1,0 +1,14 @@
+# Product Comparison Platform - Deployment Information
+# Generated: Tue Nov 25 21:53:36 -03 2025
+
+VPC_ID=vpc-0ac19fe7249ce8de7
+ECR_REPOSITORY_URL=347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-api
+EKS_CLUSTER_NAME=product-comparison-dev
+EKS_CLUSTER_ENDPOINT=https://A93A8834916DB8C3F75B4E7725322CBE.gr7.us-east-1.eks.amazonaws.com
+AWS_REGION=us-east-1
+AWS_ACCOUNT_ID=347277718217
+
+# Quick Commands:
+# kubectl get nodes
+# kubectl get pods -A
+# aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-api
