@@ -53,44 +53,7 @@
 
 ---
 
-## 🎯 Overview
 
-**Product Comparison Platform** is a production-ready, event-driven microservices platform designed for e-commerce product analysis and comparison. Built with **Clean Architecture** principles, the system leverages **AI-powered insights** using AWS Bedrock (Claude 4.5) to deliver intelligent product recommendations.
-
-### 🌟 Key Highlights
-```
-✅ Event-Driven Architecture    → RabbitMQ message broker with async processing
-✅ Clean Architecture           → Domain-centric design, framework-independent
-✅ Microservices Pattern        → 2 independent services with clear boundaries
-✅ AI Integration               → AWS Bedrock Claude 4.5 for product analysis
-✅ DevSecOps Ready              → GitHub Actions, Trivy, SonarQube, ArgoCD
-✅ Cloud Native                 → Kubernetes/EKS deployment with Terraform IaC
-✅ Production Ready             → Multi-AZ, auto-scaling, monitoring, backup
-```
-
----
-
-## ✨ Features
-
-### Core Capabilities
-
-| Feature | Description |
-|---------|-------------|
-| 🛍️ **Product Management** | Full CRUD operations with REST API |
-| 🤖 **AI-Powered Analysis** | Automatic product insights via AWS Bedrock |
-| 🔍 **Advanced Search** | Filter by category, price range, ratings |
-| 📊 **Product Comparison** | Side-by-side comparison with AI recommendations |
-| 📨 **Event-Driven** | Async processing with RabbitMQ messaging |
-| 🔄 **Real-time Updates** | Product changes trigger automatic AI analysis |
-
-### Technical Features
-```
-🏗️  Clean Architecture        📦 Value Objects (Money, Rating)
-🎯  SOLID Principles          🔌 Repository Pattern
-📡  Event-Driven Messaging    🐳 Docker Compose support
-☸️  Kubernetes Ready          🧪 Comprehensive test coverage
-🔐  Input Validation          📖 OpenAPI/Swagger docs
-```
 
 ---
 
