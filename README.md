@@ -1,7 +1,5 @@
 # Product Comparison Platform
 
-# Product Comparison Platform
-
 <div align="center">
 
 ### Core Technologies
