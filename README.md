@@ -30,9 +30,9 @@
 - [Overview](#-overview)
 - [Features](#-features)
 - [System Architecture](#-system-architecture)
-  - [Docker Compose (Development)](#docker-compose-architecture)
   - [AWS Cloud (Production)](#aws-cloud-architecture)
   - [DevSecOps Pipeline](#devsecops-pipeline)
+  - [Docker Compose (Development)](#docker-compose-architecture)
 - [Microservices Architecture](#-microservices-architecture)
   - [Product Service](#product-service-architecture)
   - [AI Service](#ai-service-architecture)
@@ -86,34 +86,6 @@
 📡  Event-Driven Messaging    🐳 Docker Compose support
 ☸️  Kubernetes Ready          🧪 Comprehensive test coverage
 🔐  Input Validation          📖 OpenAPI/Swagger docs
-```
-
----
-
-## 🏗️ System Architecture
-
-### Docker Compose Architecture
-
-**Development Environment** - Run locally with Docker Compose
-
-![Docker Compose Architecture](./docs/architecture/images/docker-comp-architecture-prod-comp-plat.png)
-
-**Components:**
-- **Product Service** (Port 8080) - REST API, Event Publisher
-- **AI Service** (Port 8081) - Event Consumer, AI Analysis
-- **RabbitMQ** (Ports 5672, 15672) - Message Broker
-- **PostgreSQL** - Databases: `productdb`, `aidb`
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Access services
-http://localhost:8080  # Product Service API
-http://localhost:8081  # AI Service API
-http://localhost:15672 # RabbitMQ Management (guest/guest)
 ```
 
 ---
@@ -180,6 +152,34 @@ graph LR
 
 2. **Application Pipeline** (Microservices)
    - Build → Security Scan → Docker Build → Push ECR → Deploy via ArgoCD
+
+---
+
+## 🏗️ System Architecture
+
+### Docker Compose Architecture
+
+**Development Environment** - Run locally with Docker Compose
+
+![Docker Compose Architecture](./docs/architecture/images/docker-comp-architecture-prod-comp-plat.png)
+
+**Components:**
+- **Product Service** (Port 8080) - REST API, Event Publisher
+- **AI Service** (Port 8081) - Event Consumer, AI Analysis
+- **RabbitMQ** (Ports 5672, 15672) - Message Broker
+- **PostgreSQL** - Databases: `productdb`, `aidb`
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Access services
+http://localhost:8080  # Product Service API
+http://localhost:8081  # AI Service API
+http://localhost:15672 # RabbitMQ Management (guest/guest)
+```
 
 ---
 
