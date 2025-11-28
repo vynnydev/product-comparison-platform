@@ -1,19 +1,51 @@
 # Product Comparison Platform
 
+# Product Comparison Platform
+
 <div align="center">
+
+### Core Technologies
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2.0-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
-![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.12-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)
+![Maven](https://img.shields.io/badge/Maven-3.9+-C71A36?style=for-the-badge&logo=apache-maven&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.12-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-24.0-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-![Clean Architecture](https://img.shields.io/badge/Architecture-Clean-blue?style=flat-square)
-![Event Driven](https://img.shields.io/badge/Pattern-Event--Driven-purple?style=flat-square)
-![Microservices](https://img.shields.io/badge/Architecture-Microservices-orange?style=flat-square)
-![Build](https://img.shields.io/badge/Build-Passing-success?style=flat-square)
-![Coverage](https://img.shields.io/badge/Coverage-85%25-green?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+### AWS Cloud Services
+
+![AWS](https://img.shields.io/badge/AWS-Cloud-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![Amazon EKS](https://img.shields.io/badge/Amazon_EKS-1.28-FF9900?style=for-the-badge&logo=amazon-eks&logoColor=white)
+![Amazon RDS](https://img.shields.io/badge/Amazon_RDS-PostgreSQL-527FFF?style=for-the-badge&logo=amazon-rds&logoColor=white)
+![Amazon MQ](https://img.shields.io/badge/Amazon_MQ-RabbitMQ-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![AWS Bedrock](https://img.shields.io/badge/AWS_Bedrock-Claude_4.5-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![Amazon ECR](https://img.shields.io/badge/Amazon_ECR-Registry-FF9900?style=for-the-badge&logo=amazon-ecs&logoColor=white)
+![CloudWatch](https://img.shields.io/badge/CloudWatch-Monitoring-FF4F8B?style=for-the-badge&logo=amazon-cloudwatch&logoColor=white)
+
+### DevSecOps & Infrastructure
+
+![Terraform](https://img.shields.io/badge/Terraform-1.6+-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-1.28-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
+![ArgoCD](https://img.shields.io/badge/ArgoCD-2.9+-EF7B4D?style=for-the-badge&logo=argo&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI/CD-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
+![Trivy](https://img.shields.io/badge/Trivy-Security-1904DA?style=for-the-badge&logo=aqua&logoColor=white)
+![SonarQube](https://img.shields.io/badge/SonarQube-10.3+-4E9BCD?style=for-the-badge&logo=sonarqube&logoColor=white)
+
+### Architecture & Patterns
+
+![Clean Architecture](https://img.shields.io/badge/Architecture-Clean-blue?style=flat-square&logo=target&logoColor=white)
+![Event Driven](https://img.shields.io/badge/Pattern-Event--Driven-purple?style=flat-square&logo=apache-kafka&logoColor=white)
+![Microservices](https://img.shields.io/badge/Architecture-Microservices-orange?style=flat-square&logo=microgenetics&logoColor=white)
+![DDD](https://img.shields.io/badge/Design-Domain--Driven-green?style=flat-square&logo=book&logoColor=white)
+![SOLID](https://img.shields.io/badge/Principles-SOLID-red?style=flat-square&logo=codacy&logoColor=white)
+
+### Status & Metrics
+
+![Build](https://img.shields.io/badge/Build-Passing-success?style=flat-square&logo=github-actions&logoColor=white)
+![Coverage](https://img.shields.io/badge/Coverage-85%25-green?style=flat-square&logo=codecov&logoColor=white)
+![Version](https://img.shields.io/badge/Version-1.0.0-blue?style=flat-square&logo=semver&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square&logo=open-source-initiative&logoColor=white)
 
 **Enterprise-grade Event-Driven Microservices Platform with AI Integration**
 
