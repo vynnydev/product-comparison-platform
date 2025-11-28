@@ -121,18 +121,6 @@
 
 ![DevSecOps Pipeline](./docs/architecture/images/devsecops-pipeline.png)
 
-**Pipeline Flow:**
-```mermaid
-graph LR
-    A[GitHub] --> B[GitHub Actions]
-    B --> C[Trivy Security Scan]
-    C --> D[SonarQube Code Quality]
-    D --> E[Docker Build]
-    E --> F[Push to ECR]
-    F --> G[ArgoCD GitOps Deploy]
-    G --> H[EKS Cluster]
-```
-
 **Tools:**
 
 | Stage | Tool | Purpose |
