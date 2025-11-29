@@ -31,7 +31,7 @@ variable "node_role_arn" {
 variable "kubernetes_version" {
   description = "Versão do Kubernetes"
   type        = string
-  default     = "1.28"
+  default     = "1.29"
 }
 
 variable "node_instance_types" {

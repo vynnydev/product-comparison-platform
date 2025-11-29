@@ -31,7 +31,7 @@ variable "availability_zones" {
 variable "kubernetes_version" {
   description = "Versão do Kubernetes"
   type        = string
-  default     = "1.28"
+  default     = "1.29"
 }
 
 variable "node_instance_types" {
@@ -74,4 +74,36 @@ variable "tags" {
   description = "Tags adicionais"
   type        = map(string)
   default     = {}
+}
+
+# ============================================
+# RABBITMQ VARIABLES
+# ============================================
+
+variable "rabbitmq_username" {
+  description = "Amazon MQ RabbitMQ username"
+  type        = string
+  default     = "admin"
+}
+
+variable "rabbitmq_password" {
+  description = "Amazon MQ RabbitMQ password"
+  type        = string
+  sensitive   = true
+}
+
+# ============================================
+# RDS VARIABLES
+# ============================================
+
+variable "db_username" {
+  description = "RDS master username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "db_password" {
+  description = "RDS master password"
+  type        = string
+  sensitive   = true
 }

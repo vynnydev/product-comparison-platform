@@ -31,19 +31,24 @@ output "availability_zones" {
 # 🐳 ECR OUTPUTS
 # ============================================
 
-output "ecr_repository_url" {
-  description = "URL completa do repositório ECR para push de imagens"
-  value       = module.ecr.repository_url
+output "ecr_repository_urls" {
+  description = "URLs dos repositórios ECR"
+  value       = module.ecr.repository_urls
 }
 
-output "ecr_repository_arn" {
-  description = "ARN do repositório ECR"
-  value       = module.ecr.repository_arn
+output "ecr_repository_arns" {
+  description = "ARNs dos repositórios ECR"
+  value       = module.ecr.repository_arns
 }
 
-output "ecr_repository_name" {
-  description = "Nome do repositório ECR"
-  value       = "${var.project_name}-${var.environment}-api"
+output "ecr_product_service_url" {
+  description = "URL do repositório ECR do product-service"
+  value       = module.ecr.product_service_url
+}
+
+output "ecr_ai_service_url" {
+  description = "URL do repositório ECR do ai-service"
+  value       = module.ecr.ai_service_url
 }
 
 # ============================================
@@ -140,31 +145,37 @@ output "step_2_verify_nodes" {
 
 output "step_3_ecr_login" {
   description = "PASSO 3: Faça login no ECR para push de imagens"
-  value       = "aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${module.ecr.repository_url}"
+  value       = "aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 }
 
 output "step_4_build_and_push" {
-  description = "PASSO 4: Build e push da imagem Docker"
+  description = "PASSO 4: Build e push das imagens Docker"
   value       = <<-EOT
-    cd backend
-    docker build -t ${module.ecr.repository_url}:latest .
-    docker push ${module.ecr.repository_url}:latest
+    # Product Service
+    cd backend/product-service
+    docker build -t ${module.ecr.product_service_url}:latest .
+    docker push ${module.ecr.product_service_url}:latest
+
+    # AI Service
+    cd ../ai-service
+    docker build -t ${module.ecr.ai_service_url}:latest .
+    docker push ${module.ecr.ai_service_url}:latest
   EOT
 }
 
 output "step_5_deploy_app" {
   description = "PASSO 5: Deploy da aplicação no Kubernetes"
-  value       = "kubectl apply -f k8s/"
+  value       = "kubectl apply -k k8s/"
 }
 
 output "step_6_check_pods" {
   description = "PASSO 6: Verificar status dos pods"
-  value       = "kubectl get pods -n default"
+  value       = "kubectl get pods -n product-platform"
 }
 
 output "step_7_get_service_url" {
   description = "PASSO 7: Obter URL do Load Balancer"
-  value       = "kubectl get svc product-api-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
+  value       = "kubectl get svc -n product-platform"
 }
 
 # ============================================
@@ -174,16 +185,17 @@ output "step_7_get_service_url" {
 output "infrastructure_summary" {
   description = "Resumo completo da infraestrutura criada"
   value = {
-    region             = var.aws_region
-    environment        = var.environment
-    project            = var.project_name
-    vpc_cidr           = var.vpc_cidr
-    availability_zones = var.availability_zones
-    eks_version        = var.kubernetes_version
-    node_count         = "${var.node_min_size}-${var.node_max_size} nodes"
-    instance_type      = join(", ", var.node_instance_types)
-    ecr_repository     = module.ecr.repository_url
-    cluster_endpoint   = module.eks.cluster_endpoint
+    region               = var.aws_region
+    environment          = var.environment
+    project              = var.project_name
+    vpc_cidr             = var.vpc_cidr
+    availability_zones   = var.availability_zones
+    eks_version          = var.kubernetes_version
+    node_count           = "${var.node_min_size}-${var.node_max_size} nodes"
+    instance_type        = join(", ", var.node_instance_types)
+    ecr_product_service  = module.ecr.product_service_url
+    ecr_ai_service       = module.ecr.ai_service_url
+    cluster_endpoint     = module.eks.cluster_endpoint
   }
 }
 
@@ -212,7 +224,7 @@ output "aws_console_links" {
   description = "Links diretos para AWS Console"
   value = {
     eks_cluster = "https://${var.aws_region}.console.aws.amazon.com/eks/home?region=${var.aws_region}#/clusters/${module.eks.cluster_name}"
-    ecr_repo    = "https://${var.aws_region}.console.aws.amazon.com/ecr/repositories/private/${data.aws_caller_identity.current.account_id}/${var.project_name}-${var.environment}-api?region=${var.aws_region}"
+    ecr_repos   = "https://${var.aws_region}.console.aws.amazon.com/ecr/repositories?region=${var.aws_region}"
     vpc         = "https://${var.aws_region}.console.aws.amazon.com/vpc/home?region=${var.aws_region}#VpcDetails:VpcId=${module.vpc.vpc_id}"
     ec2_nodes   = "https://${var.aws_region}.console.aws.amazon.com/ec2/home?region=${var.aws_region}#Instances:tag:eks:cluster-name=${module.eks.cluster_name};sort=instanceState"
   }
@@ -228,13 +240,13 @@ output "troubleshooting_commands" {
     view_cluster_info        = "kubectl cluster-info"
     view_all_resources       = "kubectl get all -A"
     view_events              = "kubectl get events -A --sort-by='.lastTimestamp'"
-    view_pod_logs            = "kubectl logs -f <pod-name>"
-    describe_pod             = "kubectl describe pod <pod-name>"
-    exec_into_pod            = "kubectl exec -it <pod-name> -- /bin/bash"
+    view_pod_logs            = "kubectl logs -f <pod-name> -n product-platform"
+    describe_pod             = "kubectl describe pod <pod-name> -n product-platform"
+    exec_into_pod            = "kubectl exec -it <pod-name> -n product-platform -- /bin/sh"
     view_node_info           = "kubectl describe nodes"
     check_cluster_health     = "kubectl get --raw '/healthz?verbose'"
     view_api_server_logs     = "kubectl logs -n kube-system -l component=kube-apiserver"
-    delete_stuck_resources   = "kubectl delete pod <pod-name> --grace-period=0 --force"
+    delete_stuck_resources   = "kubectl delete pod <pod-name> -n product-platform --grace-period=0 --force"
   }
 }
 
@@ -246,40 +258,36 @@ output "next_steps" {
   description = "Próximos passos após deploy"
   value = <<-EOT
     ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
     ║  ✅ INFRAESTRUTURA CRIADA COM SUCESSO!                        ║
-    ║                                                               ║
+    ╠═══════════════════════════════════════════════════════════════╣
     ║  📋 PRÓXIMOS PASSOS:                                          ║
     ║                                                               ║
     ║  1️⃣  Configure kubectl:                                       ║
-    ║     aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}
+    ║     aws eks update-kubeconfig --region ${var.aws_region} \    ║
+    ║       --name ${module.eks.cluster_name}                       ║
     ║                                                               ║
     ║  2️⃣  Verifique nodes:                                         ║
-    ║     kubectl get nodes                                        ║
+    ║     kubectl get nodes                                         ║
     ║                                                               ║
     ║  3️⃣  Faça login no ECR:                                       ║
-    ║     aws ecr get-login-password --region ${var.aws_region} \  ║
-    ║       | docker login --username AWS --password-stdin \       ║
-    ║       ${module.ecr.repository_url}                           ║
+    ║     aws ecr get-login-password --region ${var.aws_region} \   ║
+    ║       | docker login --username AWS --password-stdin \        ║
+    ║       ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com
     ║                                                               ║
-    ║  4️⃣  Build e Push da imagem:                                  ║
-    ║     docker build -t ${module.ecr.repository_url}:v1.0 .     ║
-    ║     docker push ${module.ecr.repository_url}:v1.0            ║
+    ║  4️⃣  Build e Push das imagens:                                ║
+    ║     # Product Service                                         ║
+    ║     docker build -t ${module.ecr.product_service_url}:latest .║
+    ║     docker push ${module.ecr.product_service_url}:latest      ║
+    ║                                                               ║
+    ║     # AI Service                                              ║
+    ║     docker build -t ${module.ecr.ai_service_url}:latest .     ║
+    ║     docker push ${module.ecr.ai_service_url}:latest           ║
     ║                                                               ║
     ║  5️⃣  Deploy no Kubernetes:                                    ║
-    ║     kubectl apply -f k8s/                                    ║
+    ║     kubectl apply -k k8s/                                     ║
     ║                                                               ║
-    ║  6️⃣  Obter URL da API:                                        ║
-    ║     kubectl get svc product-api-service                      ║
-    ║                                                               ║
-    ║  📊 Monitorar:                                                ║
-    ║     - AWS Console: EKS, ECR, CloudWatch                      ║
-    ║     - kubectl get all -A                                     ║
-    ║     - kubectl logs -f <pod-name>                             ║
-    ║                                                               ║
-    ║  ⏱️  Tempo estimado: ~20 minutos para cluster ficar pronto    ║
-    ║                                                               ║
-    ║  💰 Custo estimado: ~$${73 + (var.node_desired_size * 30.37) + 49}/mês                        ║
+    ║  6️⃣  Verificar pods:                                          ║
+    ║     kubectl get pods -n product-platform                      ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
   EOT

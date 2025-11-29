@@ -1,5 +1,5 @@
 # Terraform Backend - S3 + DynamoDB
-# 
+
 # ⚠️  IMPORTANTE: 
 # Comente este bloco na primeira execução!
 # Após criar o backend com o bootstrap, descomente.

@@ -62,6 +62,33 @@ check_command() {
 }
 
 # ============================================
+# Change to Terraform Directory
+# ============================================
+
+change_to_terraform_dir() {
+    print_step "📂 NAVIGATING TO TERRAFORM DIRECTORY"
+    
+    # Get script directory
+    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    echo "Current location: $SCRIPT_DIR"
+    
+    # Navigate to terraform root (two levels up from scripts/infrastructure/)
+    cd "$SCRIPT_DIR/../../infraestructure/terraform"
+    
+    TERRAFORM_DIR=$(pwd)
+    echo "Terraform directory: $TERRAFORM_DIR"
+    
+    # Verify we're in the right place
+    if [ ! -f "main.tf" ]; then
+        print_error "main.tf not found. Wrong directory!"
+        echo "Expected to be in: infrastructure/terraform/"
+        exit 1
+    fi
+    
+    print_success "In correct terraform directory"
+}
+
+# ============================================
 # Pre-flight Checks
 # ============================================
 
@@ -372,7 +399,7 @@ show_next_steps() {
 main() {
     print_header
 
-    cd ../../infraestructure/terraform
+    change_to_terraform_dir
     # Run deployment steps
     preflight_checks
     setup_backend

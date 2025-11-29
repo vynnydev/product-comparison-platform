@@ -1,0 +1,45 @@
+# ============================================
+# NAMESPACE - Product Comparison Platform
+# ============================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: product-platform
+  labels:
+    app.kubernetes.io/name: product-platform
+    app.kubernetes.io/part-of: product-comparison
+    environment: dev
+---
+# ============================================
+# RESOURCE QUOTA (Opcional - limita recursos)
+# ============================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: product-platform-quota
+  namespace: product-platform
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    pods: "20"
+---
+# ============================================
+# LIMIT RANGE (Defaults para pods)
+# ============================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: product-platform-limits
+  namespace: product-platform
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "256Mi"
+    type: Container
