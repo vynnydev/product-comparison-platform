@@ -1,0 +1,178 @@
+# ============================================
+# CI PIPELINE - AI SERVICE
+# ============================================
+
+name: CI - AI Service
+
+on:
+  push:
+    branches: [main, development, improvement]
+    paths:
+      - 'backend/services/ai-service/**'
+      - '.github/workflows/ci-ai-service.yml'
+  pull_request:
+    branches: [main, development, improvement]
+    paths:
+      - 'backend/services/ai-service/**'
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: product-comparison-dev-ai-service
+  JAVA_VERSION: '21'
+  SERVICE_PATH: backend/services/ai-service
+
+jobs:
+  # ============================================
+  # BUILD & TEST
+  # ============================================
+  build-and-test:
+    name: "Build & Test"
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ env.SERVICE_PATH }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 📦 Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-ai-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-ai-
+
+      - name: 🔨 Build with Maven
+        run: mvn clean compile -DskipTests -B
+
+      - name: 🧪 Run Tests
+        env:
+          SPRING_PROFILES_ACTIVE: test
+        run: mvn test -DfailIfNoTests=false -Dspring.profiles.active=test -B
+        continue-on-error: true
+
+      - name: 📦 Package JAR
+        run: mvn package -DskipTests -B
+
+      - name: 📤 Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-service-jar
+          path: ${{ env.SERVICE_PATH }}/target/*.jar
+          retention-days: 1
+
+  # ============================================
+  # SONARQUBE ANALYSIS
+  # ============================================
+  sonarqube:
+    name: "SonarQube Analysis"
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push'
+
+    defaults:
+      run:
+        working-directory: ${{ env.SERVICE_PATH }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 🔍 SonarQube Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          mvn verify sonar:sonar \
+            -DskipTests \
+            -Dsonar.projectKey=ai-service \
+            -Dsonar.projectName="AI Service" \
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.token=$SONAR_TOKEN \
+            -B
+        continue-on-error: true
+
+  # ============================================
+  # BUILD & PUSH DOCKER IMAGE
+  # ============================================
+  docker-build-push:
+    name: "Docker Build & Push"
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📥 Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ai-service-jar
+          path: ${{ env.SERVICE_PATH }}/target/
+
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔐 Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 🏷️ Generate image tags
+        id: meta
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "image_tag=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "image_latest=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest" >> $GITHUB_OUTPUT
+
+      - name: 🐳 Build Docker image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t ${{ steps.meta.outputs.image_tag }} \
+            -t ${{ steps.meta.outputs.image_latest }} \
+            ${{ env.SERVICE_PATH }}
+
+      - name: 🔒 Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta.outputs.image_tag }}
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+      - name: 🚀 Push to ECR
+        run: |
+          docker push ${{ steps.meta.outputs.image_tag }}
+          docker push ${{ steps.meta.outputs.image_latest }}
+
+      - name: 📝 Summary
+        run: |
+          echo "## 🚀 AI Service Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** ${{ steps.meta.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
