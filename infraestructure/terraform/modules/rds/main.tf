@@ -20,12 +20,22 @@ resource "aws_security_group" "rds" {
   description = "Security group for RDS PostgreSQL"
   vpc_id      = var.vpc_id
 
+  # Permitir do Security Group dos nodes EKS
   ingress {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
     security_groups = var.allowed_security_group_ids
     description     = "PostgreSQL from EKS nodes"
+  }
+
+  # Permitir da VPC inteira (subnets privadas)
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+    description = "PostgreSQL from VPC"
   }
 
   egress {

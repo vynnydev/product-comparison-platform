@@ -13,12 +13,12 @@ data:
   SPRING_PROFILES_ACTIVE: "cloud"
   
   # Database Config (Host from RDS - will be updated after terraform)
-  DB_HOST: "product-comparison-dev-postgresql.xxxxxx.us-east-1.rds.amazonaws.com"
+  DB_HOST: "product-comparison-dev-postgresql.c0j6s6gus7cz.us-east-1.rds.amazonaws.com"
   DB_PORT: "5432"
   DB_NAME: "productdb"
   
   # RabbitMQ Config (Host from Amazon MQ - will be updated after terraform)
-  RABBITMQ_HOST: "b-xxxxxx.mq.us-east-1.amazonaws.com"
+  RABBITMQ_HOST: "b-8b802f5f-83c6-4049-963d-220933e0a82b.mq.us-east-1.on.aws"
   RABBITMQ_PORT: "5672"
   
   # Application Config

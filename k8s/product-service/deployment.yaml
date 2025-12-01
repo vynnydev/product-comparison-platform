@@ -44,7 +44,7 @@ spec:
       
       containers:
       - name: product-service
-        image: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-api:latest
+        image: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-product-service:latest
         imagePullPolicy: Always
         
         ports:
@@ -123,33 +123,33 @@ spec:
             memory: "1Gi"
         
         # Health checks
-        livenessProbe:
-          httpGet:
-            path: /actuator/health/liveness
-            port: 8080
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+        # livenessProbe:
+        #   httpGet:
+        #     path: /actuator/health/liveness
+        #     port: 8080
+        #   initialDelaySeconds: 90
+        #   periodSeconds: 10
+        #   timeoutSeconds: 5
+        #   failureThreshold: 3
         
-        readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
+        # readinessProbe:
+        #   httpGet:
+        #     path: /actuator/health/readiness
+        #     port: 8080
+        #   initialDelaySeconds: 60
+        #   periodSeconds: 5
+        #   timeoutSeconds: 3
+        #   failureThreshold: 3
         
-        # Startup probe (para aplicações que demoram a iniciar)
-        startupProbe:
-          httpGet:
-            path: /actuator/health
-            port: 8080
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 30
+        # # Startup probe (para aplicações que demoram a iniciar)
+        # startupProbe:
+        #   httpGet:
+        #     path: /actuator/health
+        #     port: 8080
+        #   initialDelaySeconds: 45
+        #   periodSeconds: 10
+        #   timeoutSeconds: 5
+        #   failureThreshold: 30
       
       # Pod disruption budget
       affinity:

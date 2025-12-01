@@ -35,12 +35,15 @@ spec:
       
       # Init container para aguardar dependências
       initContainers:
-      - name: wait-for-rabbitmq
-        image: busybox:1.36
-        command: ['sh', '-c', 'until nc -z $RABBITMQ_HOST 5672; do echo waiting for rabbitmq; sleep 2; done']
-        envFrom:
-        - configMapRef:
-            name: shared-config
+        - name: wait-for-rabbitmq
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - "until nc -z $RABBITMQ_HOST 5671; do echo waiting for rabbitmq; sleep 2; done"
+          envFrom:
+            - configMapRef:
+                name: shared-config
       
       containers:
       - name: ai-service
@@ -131,32 +134,32 @@ spec:
             memory: "1536Mi"
         
         # Health checks
-        livenessProbe:
-          httpGet:
-            path: /actuator/health/liveness
-            port: 8081
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+        # livenessProbe:
+        #   httpGet:
+        #     path: /actuator/health/liveness
+        #     port: 8081
+        #   initialDelaySeconds: 90
+        #   periodSeconds: 10
+        #   timeoutSeconds: 5
+        #   failureThreshold: 3
         
-        readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
-            port: 8081
-          initialDelaySeconds: 30
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
+        # readinessProbe:
+        #   httpGet:
+        #     path: /actuator/health/readiness
+        #     port: 8081
+        #   initialDelaySeconds: 60
+        #   periodSeconds: 5
+        #   timeoutSeconds: 3
+        #   failureThreshold: 3
         
-        startupProbe:
-          httpGet:
-            path: /actuator/health
-            port: 8081
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 30
+        # startupProbe:
+        #   httpGet:
+        #     path: /actuator/health
+        #     port: 8081
+        #   initialDelaySeconds: 45
+        #   periodSeconds: 10
+        #   timeoutSeconds: 5
+        #   failureThreshold: 30
       
       # Anti-affinity para distribuir pods
       affinity:

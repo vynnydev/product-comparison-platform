@@ -8,7 +8,7 @@ resource "aws_security_group" "amazonmq" {
   description = "Security group for Amazon MQ RabbitMQ broker"
   vpc_id      = var.vpc_id
 
-  # AMQPS port (SSL) - Amazon MQ requires SSL
+  # AMQPS port (SSL)
   ingress {
     from_port       = 5671
     to_port         = 5671
@@ -17,13 +17,22 @@ resource "aws_security_group" "amazonmq" {
     description     = "AMQPS (SSL) from EKS nodes"
   }
 
+  # Permitir da VPC inteira
+  ingress {
+    from_port   = 5671
+    to_port     = 5671
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+    description = "AMQPS from VPC"
+  }
+
   # Management console (HTTPS)
   ingress {
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    security_groups = var.allowed_security_group_ids
-    description     = "RabbitMQ Management Console (HTTPS)"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+    description = "RabbitMQ Management Console (HTTPS)"
   }
 
   egress {
