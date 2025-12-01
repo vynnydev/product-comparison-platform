@@ -7,7 +7,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-K8S_DIR="${SCRIPT_DIR}/../k8s/monitoring"
+K8S_DIR="../../k8s/monitoring/"
 
 echo "============================================"
 echo "  Installing Observability Stack"
