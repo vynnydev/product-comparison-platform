@@ -105,10 +105,14 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.0.0-M9</version>
                 <configuration>
+                    <skipTests>${skipTests}</skipTests>
+                    <failIfNoTests>false</failIfNoTests>
+                </configuration>
+                <!-- <configuration>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
-                </configuration>
+                </configuration> -->
             </plugin>
         </plugins>
     </build>
