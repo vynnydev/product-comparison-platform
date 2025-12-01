@@ -135,23 +135,25 @@ resource "aws_route_table_association" "public" {
 }
 
 # --------------------------------------------
-# PRIVATE ROUTE TABLE
+# PRIVATE ROUTE TABLE (com rota inline)
 # --------------------------------------------
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
+  # Rota inline para NAT Gateway
+  dynamic "route" {
+    for_each = var.enable_nat_gateway ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.main[0].id
+    }
+  }
+
   tags = {
     Name = "${var.project_name}-${var.environment}-private-rt"
   }
-}
 
-# Route to NAT Gateway (only if NAT is enabled)
-resource "aws_route" "private_nat" {
-  count = var.enable_nat_gateway ? 1 : 0
-
-  route_table_id         = aws_route_table.private.id
-  destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.main[0].id
+  depends_on = [aws_nat_gateway.main]
 }
 
 resource "aws_route_table_association" "private" {

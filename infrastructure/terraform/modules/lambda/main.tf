@@ -108,7 +108,20 @@ resource "aws_iam_role_policy" "lambda_vpc" {
 data "archive_file" "lambda" {
   type        = "zip"
   source_dir  = "${path.module}/src"
-  output_path = "${path.module}/src/lambda.zip"
+  output_path = "${path.module}/lambda.zip"
+  
+  depends_on = [null_resource.lambda_src_check]
+}
+
+# Garantir que o diretório src existe
+resource "null_resource" "lambda_src_check" {
+  triggers = {
+    always_run = timestamp()
+  }
+  
+  provisioner "local-exec" {
+    command = "test -f ${path.module}/src/handler.py || echo 'handler.py not found!'"
+  }
 }
 
 resource "aws_lambda_function" "main" {
