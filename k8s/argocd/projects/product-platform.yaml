@@ -1,0 +1,78 @@
+# ============================================
+# ARGOCD PROJECT - PRODUCT COMPARISON PLATFORM
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: product-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Product Comparison Platform - Microservices
+
+  # Source repositories
+  sourceRepos:
+    - 'https://github.com/YOUR_ORG/product-comparison-platform.git'  # Update with your repo
+    - 'https://github.com/YOUR_ORG/*'
+
+  # Destination clusters and namespaces
+  destinations:
+    - namespace: product-platform
+      server: https://kubernetes.default.svc
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+
+  # Cluster resource whitelist
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+
+  # Namespace resource blacklist (security)
+  namespaceResourceBlacklist:
+    - group: ''
+      kind: ResourceQuota
+    - group: ''
+      kind: LimitRange
+
+  # Namespace resource whitelist
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: '*'
+    - group: apps
+      kind: '*'
+    - group: networking.k8s.io
+      kind: '*'
+    - group: autoscaling
+      kind: '*'
+
+  # Roles
+  roles:
+    - name: developer
+      description: Developer access to product-platform
+      policies:
+        - p, proj:product-platform:developer, applications, get, product-platform/*, allow
+        - p, proj:product-platform:developer, applications, sync, product-platform/*, allow
+        - p, proj:product-platform:developer, applications, action/*, product-platform/*, allow
+      groups:
+        - developers
+
+    - name: admin
+      description: Admin access to product-platform
+      policies:
+        - p, proj:product-platform:admin, applications, *, product-platform/*, allow
+        - p, proj:product-platform:admin, repositories, *, product-platform/*, allow
+      groups:
+        - admins
+
+  # Sync windows (optional - control when syncs can happen)
+  # syncWindows:
+  #   - kind: allow
+  #     schedule: '0 * * * *'
+  #     duration: 1h
+  #     applications:
+  #       - '*'

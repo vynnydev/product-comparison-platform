@@ -1,0 +1,174 @@
+# ============================================
+# ARGOCD NOTIFICATIONS CONFIG
+# Slack, GitHub, and Webhook notifications
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+data:
+  # ============================================
+  # NOTIFICATION SERVICES
+  # ============================================
+  
+  # Slack Integration
+  service.slack: |
+    token: $slack-token
+    
+  # GitHub Integration (for commit status)
+  service.github: |
+    appID: $github-app-id
+    installationID: $github-installation-id
+    privateKey: $github-private-key
+
+  # Webhook (for custom integrations)
+  service.webhook.custom: |
+    url: $webhook-url
+    headers:
+      - name: Authorization
+        value: Bearer $webhook-token
+
+  # ============================================
+  # NOTIFICATION TEMPLATES
+  # ============================================
+  
+  template.app-deployed: |
+    message: |
+      🚀 *{{.app.metadata.name}}* deployed successfully!
+      
+      *Application:* {{.app.metadata.name}}
+      *Environment:* {{.app.spec.destination.namespace}}
+      *Revision:* {{.app.status.sync.revision | substr 0 7}}
+      *Sync Status:* {{.app.status.sync.status}}
+      *Health:* {{.app.status.health.status}}
+      
+      <{{.context.argocdUrl}}/applications/{{.app.metadata.name}}|View in ArgoCD>
+    slack:
+      attachments: |
+        [{
+          "color": "#18be52",
+          "title": "{{.app.metadata.name}} Deployed",
+          "fields": [
+            {"title": "Application", "value": "{{.app.metadata.name}}", "short": true},
+            {"title": "Revision", "value": "{{.app.status.sync.revision | substr 0 7}}", "short": true}
+          ]
+        }]
+
+  template.app-health-degraded: |
+    message: |
+      ⚠️ *{{.app.metadata.name}}* health degraded!
+      
+      *Application:* {{.app.metadata.name}}
+      *Health Status:* {{.app.status.health.status}}
+      *Message:* {{.app.status.health.message}}
+      
+      <{{.context.argocdUrl}}/applications/{{.app.metadata.name}}|View in ArgoCD>
+    slack:
+      attachments: |
+        [{
+          "color": "#f4c030",
+          "title": "{{.app.metadata.name}} Health Degraded",
+          "fields": [
+            {"title": "Status", "value": "{{.app.status.health.status}}", "short": true}
+          ]
+        }]
+
+  template.app-sync-failed: |
+    message: |
+      ❌ *{{.app.metadata.name}}* sync failed!
+      
+      *Application:* {{.app.metadata.name}}
+      *Sync Status:* {{.app.status.sync.status}}
+      *Error:* {{.app.status.operationState.message}}
+      
+      <{{.context.argocdUrl}}/applications/{{.app.metadata.name}}|View in ArgoCD>
+    slack:
+      attachments: |
+        [{
+          "color": "#e01e5a",
+          "title": "{{.app.metadata.name}} Sync Failed",
+          "fields": [
+            {"title": "Error", "value": "{{.app.status.operationState.message}}", "short": false}
+          ]
+        }]
+
+  template.app-sync-running: |
+    message: |
+      🔄 *{{.app.metadata.name}}* sync in progress...
+      
+      *Revision:* {{.app.status.sync.revision | substr 0 7}}
+    slack:
+      attachments: |
+        [{
+          "color": "#0066ff",
+          "title": "{{.app.metadata.name}} Syncing"
+        }]
+
+  # ============================================
+  # NOTIFICATION TRIGGERS
+  # ============================================
+  
+  trigger.on-deployed: |
+    - description: Application is synced and healthy
+      send:
+        - app-deployed
+      when: app.status.sync.status == 'Synced' and app.status.health.status == 'Healthy'
+      oncePer: app.status.sync.revision
+
+  trigger.on-health-degraded: |
+    - description: Application health has degraded
+      send:
+        - app-health-degraded
+      when: app.status.health.status == 'Degraded'
+
+  trigger.on-sync-failed: |
+    - description: Application sync has failed
+      send:
+        - app-sync-failed
+      when: app.status.sync.status == 'Unknown' or app.status.operationState.phase == 'Error'
+
+  trigger.on-sync-running: |
+    - description: Application sync is running
+      send:
+        - app-sync-running
+      when: app.status.operationState.phase == 'Running'
+
+  # ============================================
+  # DEFAULT SUBSCRIPTIONS
+  # ============================================
+  
+  subscriptions: |
+    - recipients:
+        - slack:deployments
+      triggers:
+        - on-deployed
+        - on-health-degraded
+        - on-sync-failed
+
+---
+# ============================================
+# ARGOCD NOTIFICATIONS SECRET
+# Store sensitive notification credentials
+# ============================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-notifications-secret
+  namespace: argocd
+type: Opaque
+stringData:
+  # Slack Bot Token
+  slack-token: "xoxb-your-slack-bot-token"
+  
+  # GitHub App credentials (optional)
+  github-app-id: "your-github-app-id"
+  github-installation-id: "your-installation-id"
+  github-private-key: |
+    -----BEGIN RSA PRIVATE KEY-----
+    your-private-key-here
+    -----END RSA PRIVATE KEY-----
+  
+  # Custom webhook (optional)
+  webhook-url: "https://your-webhook-endpoint.com/argocd"
+  webhook-token: "your-webhook-token"

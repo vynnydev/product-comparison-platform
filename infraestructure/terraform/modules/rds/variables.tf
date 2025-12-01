@@ -1,67 +1,97 @@
+# ============================================
+# RDS MODULE VARIABLES
+# ============================================
+
 variable "project_name" {
-  description = "Nome do projeto"
+  description = "Name of the project"
   type        = string
 }
 
 variable "environment" {
-  description = "Ambiente"
+  description = "Environment (dev, staging, prod)"
   type        = string
 }
 
 variable "vpc_id" {
-  description = "VPC ID"
+  description = "VPC ID where RDS will be created"
   type        = string
 }
 
+variable "vpc_cidr" {
+  description = "VPC CIDR block for security group rules"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
 variable "subnet_ids" {
-  description = "Private subnet IDs"
+  description = "List of subnet IDs for DB subnet group"
   type        = list(string)
 }
 
 variable "allowed_security_group_ids" {
-  description = "Security groups permitidos"
+  description = "List of security group IDs allowed to access RDS"
   type        = list(string)
   default     = []
 }
 
-variable "db_instance_class" {
-  description = "Classe da instância RDS"
-  type        = string
-  default     = "db.t3.micro"
-}
+# ============================================
+# DATABASE CONFIGURATION
+# ============================================
 
 variable "db_name" {
-  description = "Nome do database"
+  description = "Name of the primary database"
   type        = string
   default     = "productdb"
 }
 
 variable "db_username" {
-  description = "Master username"
+  description = "Master username for the database"
   type        = string
   default     = "postgres"
 }
 
 variable "db_password" {
-  description = "Master password"
+  description = "Master password for the database"
   type        = string
   sensitive   = true
 }
 
+variable "additional_databases" {
+  description = "List of additional databases to create"
+  type        = list(string)
+  default     = []
+}
+
+# ============================================
+# INSTANCE CONFIGURATION
+# ============================================
+
+variable "db_instance_class" {
+  description = "RDS instance class"
+  type        = string
+  default     = "db.t3.micro"
+}
+
+variable "engine_version" {
+  description = "PostgreSQL engine version"
+  type        = string
+  default     = "15.7"
+}
+
 variable "allocated_storage" {
-  description = "Storage alocado (GB)"
+  description = "Allocated storage in GB"
   type        = number
   default     = 20
 }
 
-variable "backup_retention_period" {
-  description = "Período de retenção de backup (dias)"
-  type        = number
-  default     = 7
-}
-
 variable "multi_az" {
-  description = "Enable Multi-AZ"
+  description = "Enable Multi-AZ deployment"
   type        = bool
   default     = false
+}
+
+variable "backup_retention_period" {
+  description = "Number of days to retain backups"
+  type        = number
+  default     = 7
 }

@@ -1,0 +1,88 @@
+# ============================================
+# ARGOCD APPLICATION - PRODUCT SERVICE
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: product-service
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: product-service
+    app.kubernetes.io/part-of: product-platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: product-platform
+
+  source:
+    repoURL: https://github.com/YOUR_ORG/product-comparison-platform.git  # Update with your repo
+    targetRevision: main
+    path: k8s/product-service
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: product-platform
+
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true           # Delete resources that are no longer in Git
+      selfHeal: true        # Sync when cluster state differs from Git
+      allowEmpty: false     # Don't sync if path is empty
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore differences in these fields
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore replica count (managed by HPA)
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /spec/minReplicas
+        - /spec/maxReplicas
+
+  # Health checks
+  revisionHistoryLimit: 10
+
+---
+# ============================================
+# ARGOCD APPLICATION - PRODUCT SERVICE CONFIG
+# (ConfigMaps and Secrets)
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: product-service-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: product-service-config
+    app.kubernetes.io/part-of: product-platform
+spec:
+  project: product-platform
+
+  source:
+    repoURL: https://github.com/YOUR_ORG/product-comparison-platform.git
+    targetRevision: main
+    path: k8s/infrastructure
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: product-platform
+
+  syncPolicy:
+    automated:
+      prune: false          # Don't auto-delete configs
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

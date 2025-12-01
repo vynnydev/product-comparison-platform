@@ -1,0 +1,147 @@
+# ============================================
+# ARGOCD APP OF APPS
+# Single application that manages all other applications
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: product-platform-apps
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: product-platform-apps
+    app.kubernetes.io/part-of: product-platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/YOUR_ORG/product-comparison-platform.git  # Update with your repo
+    targetRevision: main
+    path: k8s/argocd/apps
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+# ============================================
+# APPLICATIONSET - DYNAMIC APP GENERATION
+# Automatically create apps for each service
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: product-platform-services
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - name: product-service
+            path: k8s/product-service
+            namespace: product-platform
+          - name: ai-service
+            path: k8s/ai-service
+            namespace: product-platform
+
+  template:
+    metadata:
+      name: '{{name}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: '{{name}}'
+        app.kubernetes.io/part-of: product-platform
+        generated-by: applicationset
+    spec:
+      project: product-platform
+      
+      source:
+        repoURL: https://github.com/YOUR_ORG/product-comparison-platform.git
+        targetRevision: main
+        path: '{{path}}'
+      
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+
+---
+# ============================================
+# APPLICATIONSET - ENVIRONMENT BASED
+# Deploy to multiple environments
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: product-platform-environments
+  namespace: argocd
+spec:
+  generators:
+    - matrix:
+        generators:
+          - list:
+              elements:
+                - environment: dev
+                  cluster: https://kubernetes.default.svc
+                  branch: develop
+                - environment: staging
+                  cluster: https://kubernetes.default.svc
+                  branch: staging
+                - environment: prod
+                  cluster: https://kubernetes.default.svc
+                  branch: main
+          - list:
+              elements:
+                - service: product-service
+                - service: ai-service
+
+  template:
+    metadata:
+      name: '{{service}}-{{environment}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: '{{service}}'
+        app.kubernetes.io/environment: '{{environment}}'
+        app.kubernetes.io/part-of: product-platform
+    spec:
+      project: product-platform
+      
+      source:
+        repoURL: https://github.com/YOUR_ORG/product-comparison-platform.git
+        targetRevision: '{{branch}}'
+        path: 'k8s/{{service}}'
+        
+        # Kustomize overlays per environment
+        # kustomize:
+        #   namePrefix: '{{environment}}-'
+      
+      destination:
+        server: '{{cluster}}'
+        namespace: 'product-platform-{{environment}}'
+      
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

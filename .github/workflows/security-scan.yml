@@ -1,0 +1,274 @@
+# ============================================
+# DEVSECOPS PIPELINE - SECURITY SCANNING
+# SAST, DAST, Dependency Check, Container Scan
+# ============================================
+
+name: DevSecOps - Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run weekly security scan
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: '21'
+
+jobs:
+  # ============================================
+  # DEPENDENCY VULNERABILITY CHECK (OWASP)
+  # ============================================
+  dependency-check:
+    name: OWASP Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 🔍 OWASP Dependency Check - Product Service
+        working-directory: backend/services/product-service
+        run: |
+          mvn org.owasp:dependency-check-maven:check \
+            -DfailBuildOnCVSS=9 \
+            || true
+        continue-on-error: true
+
+      - name: 🔍 OWASP Dependency Check - AI Service
+        working-directory: backend/services/ai-service
+        run: |
+          mvn org.owasp:dependency-check-maven:check \
+            -DfailBuildOnCVSS=9 \
+            || true
+        continue-on-error: true
+
+      - name: 📤 Upload Dependency Check Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-reports
+          path: |
+            backend/services/*/target/dependency-check-report.html
+          retention-days: 30
+
+  # ============================================
+  # SAST - STATIC APPLICATION SECURITY TESTING
+  # ============================================
+  sast-codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['java']
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: 🔧 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: 🔨 Build for CodeQL
+        run: |
+          cd backend/services/product-service && mvn compile -DskipTests || true
+          cd ../ai-service && mvn compile -DskipTests || true
+        continue-on-error: true
+
+      - name: 🔍 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ============================================
+  # SAST - SEMGREP
+  # ============================================
+  sast-semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Run Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/java
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        continue-on-error: true
+
+  # ============================================
+  # SECRET SCANNING
+  # ============================================
+  secret-scan:
+    name: Secret Scanning (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  # ============================================
+  # CONTAINER IMAGE SCANNING
+  # ============================================
+  container-scan:
+    name: Container Scan (Trivy)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: product-service
+            context: backend/services/product-service
+          - name: ai-service
+            context: backend/services/ai-service
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 📦 Build JAR
+        working-directory: ${{ matrix.image.context }}
+        run: mvn package -DskipTests
+        continue-on-error: true
+
+      - name: 🐳 Build Docker image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t ${{ matrix.image.name }}:scan \
+            ${{ matrix.image.context }}
+        continue-on-error: true
+
+      - name: 🔒 Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ matrix.image.name }}:scan
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          vuln-type: 'os,library'
+        continue-on-error: true
+
+  # ============================================
+  # KUBERNETES MANIFEST SCANNING
+  # ============================================
+  k8s-scan:
+    name: K8s Manifest Scan (Kubesec)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Run Kubesec - Product Service
+        uses: controlplaneio/kubesec-action@v0.0.2
+        with:
+          input: k8s/product-service/deployment.yaml
+        continue-on-error: true
+
+      - name: 🔍 Run Kubesec - AI Service
+        uses: controlplaneio/kubesec-action@v0.0.2
+        with:
+          input: k8s/ai-service/deployment.yaml
+        continue-on-error: true
+
+  # ============================================
+  # TERRAFORM SECURITY SCAN
+  # ============================================
+  terraform-scan:
+    name: Terraform Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔒 Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infrastructure/terraform
+          framework: terraform
+          output_format: cli
+          soft_fail: true
+        continue-on-error: true
+
+      - name: 🔒 Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infrastructure/terraform
+          soft_fail: true
+        continue-on-error: true
+
+  # ============================================
+  # SECURITY REPORT SUMMARY
+  # ============================================
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-check, sast-codeql, sast-semgrep, secret-scan, k8s-scan, terraform-scan]
+    if: always()
+
+    steps:
+      - name: 📊 Generate Security Summary
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| OWASP Dependency Check | ${{ needs.dependency-check.result == 'success' && '✅ Passed' || '⚠️ Check logs' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL SAST | ${{ needs.sast-codeql.result == 'success' && '✅ Passed' || '⚠️ Check logs' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Semgrep SAST | ${{ needs.sast-semgrep.result == 'success' && '✅ Passed' || '⚠️ Check logs' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gitleaks Secret Scan | ${{ needs.secret-scan.result == 'success' && '✅ Passed' || '⚠️ Check logs' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Kubesec K8s Scan | ${{ needs.k8s-scan.result == 'success' && '✅ Passed' || '⚠️ Check logs' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Security | ${{ needs.terraform-scan.result == 'success' && '✅ Passed' || '⚠️ Check logs' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📅 Scan completed: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ All scans run with soft_fail=true to avoid blocking the pipeline." >> $GITHUB_STEP_SUMMARY
+          echo "Review the individual job logs for detailed findings." >> $GITHUB_STEP_SUMMARY

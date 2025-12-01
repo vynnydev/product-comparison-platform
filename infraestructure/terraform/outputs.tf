@@ -313,3 +313,25 @@ output "deployment_timestamp" {
   description = "Timestamp do deploy"
   value       = timestamp()
 }
+
+# ============================================
+# API Gateway
+# ============================================
+output "ai_api_url" {
+  description = "AI Service API URL"
+  value       = "${module.api_gateway_ai.stage_invoke_url}/ai"
+}
+
+output "ai_health_url" {
+  description = "AI Service Health Check URL"
+  value       = "${module.api_gateway_ai.stage_invoke_url}/ai/health"
+}
+
+# ============================================
+# AI Lambda
+# ============================================
+
+output "lambda_ai_function_name" {
+  description = "Lambda function name"
+  value       = module.lambda_ai.function_name
+}

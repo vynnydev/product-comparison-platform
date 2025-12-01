@@ -1,0 +1,321 @@
+# ============================================
+# CI PIPELINE - BACKEND MICROSERVICES
+# Build, Test, Scan, Push to ECR
+# ============================================
+
+name: CI - Backend Services
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/services/**'
+      - '.github/workflows/ci-backend.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/services/**'
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+  JAVA_VERSION: '21'
+
+jobs:
+  # ============================================
+  # DETECT CHANGES
+  # ============================================
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      product-service: ${{ steps.changes.outputs.product-service }}
+      ai-service: ${{ steps.changes.outputs.ai-service }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            product-service:
+              - 'backend/services/product-service/**'
+            ai-service:
+              - 'backend/services/ai-service/**'
+
+  # ============================================
+  # BUILD & TEST - PRODUCT SERVICE
+  # ============================================
+  build-product-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.product-service == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/services/product-service
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 📦 Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: 🔨 Build with Maven
+        run: mvn clean compile -DskipTests
+
+      - name: 🧪 Run Unit Tests
+        run: mvn test
+
+      - name: 📊 Generate Test Report
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Product Service Tests
+          path: backend/services/product-service/target/surefire-reports/*.xml
+          reporter: java-junit
+
+      - name: 📦 Package JAR
+        run: mvn package -DskipTests
+
+      - name: 📤 Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-service-jar
+          path: backend/services/product-service/target/*.jar
+          retention-days: 1
+
+  # ============================================
+  # BUILD & TEST - AI SERVICE
+  # ============================================
+  build-ai-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ai-service == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/services/ai-service
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 📦 Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: 🔨 Build with Maven
+        run: mvn clean compile -DskipTests
+
+      - name: 🧪 Run Unit Tests
+        run: mvn test
+
+      - name: 📊 Generate Test Report
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: AI Service Tests
+          path: backend/services/ai-service/target/surefire-reports/*.xml
+          reporter: java-junit
+
+      - name: 📦 Package JAR
+        run: mvn package -DskipTests
+
+      - name: 📤 Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-service-jar
+          path: backend/services/ai-service/target/*.jar
+          retention-days: 1
+
+  # ============================================
+  # SONARQUBE ANALYSIS
+  # ============================================
+  sonarqube:
+    needs: [build-product-service, build-ai-service]
+    if: always() && (needs.build-product-service.result == 'success' || needs.build-ai-service.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 📦 Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: 🔍 SonarQube Scan - Product Service
+        if: needs.build-product-service.result == 'success'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        working-directory: backend/services/product-service
+        run: |
+          mvn verify sonar:sonar \
+            -Dsonar.projectKey=product-service \
+            -Dsonar.projectName="Product Service" \
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.token=$SONAR_TOKEN \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+        continue-on-error: true  # Don't fail if SonarQube is not configured
+
+      - name: 🔍 SonarQube Scan - AI Service
+        if: needs.build-ai-service.result == 'success'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        working-directory: backend/services/ai-service
+        run: |
+          mvn verify sonar:sonar \
+            -Dsonar.projectKey=ai-service \
+            -Dsonar.projectName="AI Service" \
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.token=$SONAR_TOKEN \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+        continue-on-error: true
+
+  # ============================================
+  # BUILD & PUSH DOCKER IMAGES
+  # ============================================
+  docker-build-push:
+    needs: [build-product-service, build-ai-service, sonarqube]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: product-service
+            context: backend/services/product-service
+            ecr_repo: product-comparison-dev-product-service
+          - service: ai-service
+            context: backend/services/ai-service
+            ecr_repo: product-comparison-dev-ai-service
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔐 Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 📥 Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.service }}-jar
+          path: ${{ matrix.context }}/target/
+
+      - name: 🏷️ Generate image tags
+        id: meta
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "image_tag=${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "image_latest=${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:latest" >> $GITHUB_OUTPUT
+
+      - name: 🐳 Build Docker image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t ${{ steps.meta.outputs.image_tag }} \
+            -t ${{ steps.meta.outputs.image_latest }} \
+            ${{ matrix.context }}
+
+      - name: 🔒 Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta.outputs.image_tag }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'  # Don't fail on vulnerabilities (change to '1' for strict mode)
+
+      - name: 📤 Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+
+      - name: 🚀 Push to ECR
+        run: |
+          docker push ${{ steps.meta.outputs.image_tag }}
+          docker push ${{ steps.meta.outputs.image_latest }}
+
+      - name: 📝 Update deployment image tag
+        run: |
+          echo "IMAGE_TAG=${{ steps.meta.outputs.short_sha }}" >> $GITHUB_ENV
+          echo "🎉 Pushed ${{ matrix.service }} with tag: ${{ steps.meta.outputs.short_sha }}"
+
+  # ============================================
+  # UPDATE KUBERNETES MANIFESTS
+  # ============================================
+  update-manifests:
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Get image tag
+        id: tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "tag=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - name: 📝 Update image tags in K8s manifests
+        run: |
+          # Update product-service
+          sed -i "s|image: .*product-service:.*|image: ${{ env.ECR_REGISTRY }}/product-comparison-dev-product-service:${{ steps.tag.outputs.tag }}|g" \
+            k8s/product-service/deployment.yaml
+          
+          # Update ai-service
+          sed -i "s|image: .*ai-service:.*|image: ${{ env.ECR_REGISTRY }}/product-comparison-dev-ai-service:${{ steps.tag.outputs.tag }}|g" \
+            k8s/ai-service/deployment.yaml
+
+      - name: 📤 Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add k8s/
+          git diff --staged --quiet || git commit -m "ci: update image tags to ${{ steps.tag.outputs.tag }} [skip ci]"
+          git push

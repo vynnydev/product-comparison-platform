@@ -34,7 +34,7 @@ resource "aws_security_group" "rds" {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.vpc_cidr]
     description = "PostgreSQL from VPC"
   }
 
@@ -62,16 +62,16 @@ resource "aws_db_instance" "postgresql" {
 
   # Engine
   engine         = "postgres"
-  engine_version = "15.7"
+  engine_version = var.engine_version
   instance_class = var.db_instance_class
 
   # Storage
   allocated_storage     = var.allocated_storage
-  max_allocated_storage = var.allocated_storage * 2  # Auto-scaling up to 2x
+  max_allocated_storage = var.allocated_storage * 2
   storage_type          = "gp3"
   storage_encrypted     = true
 
-  # Database
+  # Database (principal)
   db_name  = var.db_name
   username = var.db_username
   password = var.db_password
@@ -87,14 +87,14 @@ resource "aws_db_instance" "postgresql" {
 
   # Backup
   backup_retention_period = var.backup_retention_period
-  backup_window           = "03:00-04:00"  # UTC
+  backup_window           = "03:00-04:00"
   maintenance_window      = "sun:04:00-sun:05:00"
   skip_final_snapshot     = var.environment == "dev" ? true : false
   final_snapshot_identifier = var.environment != "dev" ? "${var.project_name}-${var.environment}-final-snapshot-${formatdate("YYYY-MM-DD-hhmm", timestamp())}" : null
 
   # Monitoring
-  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
-  performance_insights_enabled    = true
+  enabled_cloudwatch_logs_exports       = ["postgresql", "upgrade"]
+  performance_insights_enabled          = true
   performance_insights_retention_period = 7
 
   # Updates
@@ -108,11 +108,62 @@ resource "aws_db_instance" "postgresql" {
   }
 }
 
-# SSM Parameters
+# ============================================
+# CRIAR BANCOS DE DADOS ADICIONAIS
+# ============================================
+
+# Null resource para criar bancos adicionais após o RDS estar pronto
+resource "null_resource" "create_additional_databases" {
+  count = length(var.additional_databases) > 0 ? 1 : 0
+
+  depends_on = [aws_db_instance.postgresql]
+
+  triggers = {
+    databases = join(",", var.additional_databases)
+    endpoint  = aws_db_instance.postgresql.endpoint
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      PGPASSWORD = var.db_password
+    }
+    command = <<-EOT
+      for db in ${join(" ", var.additional_databases)}; do
+        echo "Creating database: $db"
+        psql -h ${aws_db_instance.postgresql.address} \
+             -U ${var.db_username} \
+             -d ${var.db_name} \
+             -c "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1 || \
+        psql -h ${aws_db_instance.postgresql.address} \
+             -U ${var.db_username} \
+             -d ${var.db_name} \
+             -c "CREATE DATABASE $db;"
+        echo "Database $db created or already exists"
+      done
+    EOT
+  }
+}
+
+# ============================================
+# SSM PARAMETERS
+# ============================================
+
 resource "aws_ssm_parameter" "db_endpoint" {
   name  = "/${var.project_name}/${var.environment}/rds/endpoint"
   type  = "String"
   value = aws_db_instance.postgresql.endpoint
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_ssm_parameter" "db_address" {
+  name  = "/${var.project_name}/${var.environment}/rds/address"
+  type  = "String"
+  value = aws_db_instance.postgresql.address
 
   tags = {
     Environment = var.environment
@@ -146,6 +197,20 @@ resource "aws_ssm_parameter" "db_password" {
   name  = "/${var.project_name}/${var.environment}/rds/password"
   type  = "SecureString"
   value = var.db_password
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# SSM para bancos adicionais
+resource "aws_ssm_parameter" "additional_databases" {
+  count = length(var.additional_databases)
+
+  name  = "/${var.project_name}/${var.environment}/rds/databases/${var.additional_databases[count.index]}"
+  type  = "String"
+  value = var.additional_databases[count.index]
 
   tags = {
     Environment = var.environment
