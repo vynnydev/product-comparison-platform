@@ -108,7 +108,7 @@ resource "aws_iam_role_policy" "lambda_vpc" {
 data "archive_file" "lambda" {
   type        = "zip"
   source_dir  = "${path.module}/src"
-  output_path = "${path.module}/lambda.zip"
+  output_path = "${path.module}/src/lambda.zip"
 }
 
 resource "aws_lambda_function" "main" {
