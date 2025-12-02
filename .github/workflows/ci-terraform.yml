@@ -1,20 +1,26 @@
 # ============================================
 # CI PIPELINE - TERRAFORM
-# Validate, Security Scan, Plan, Apply, Destroy
+# Automated Infrastructure Management
+# ============================================
+# Features:
+# - Auto-detects and creates backend if missing
+# - Plan/Apply/Destroy infrastructure
+# - NEVER destroys backend (S3 + DynamoDB)
+# - Works on any branch via manual trigger
 # ============================================
 
 name: CI - Terraform
 
 on:
   push:
-    branches: [main, development, improvement]
+    branches: [main]
     paths:
       - 'infrastructure/terraform/**'
       - '!infrastructure/terraform/modules/bootstrap/**'
       - '!infrastructure/terraform/modules/backend/**'
       - '.github/workflows/ci-terraform.yml'
   pull_request:
-    branches: [main, development, improvement]
+    branches: [main]
     paths:
       - 'infrastructure/terraform/**'
   workflow_dispatch:
@@ -29,7 +35,7 @@ on:
           - apply
           - destroy
       confirm_destroy:
-        description: 'Type DESTROY to confirm destruction'
+        description: 'Type DESTROY to confirm (only for destroy action)'
         required: false
         type: string
         default: ''
@@ -38,16 +44,85 @@ env:
   AWS_REGION: us-east-1
   TF_VERSION: '1.6.0'
   TF_WORKING_DIR: infrastructure/terraform
+  TF_BOOTSTRAP_DIR: infrastructure/terraform/modules/bootstrap
   TF_VAR_project_name: product-comparison
   TF_VAR_environment: dev
 
 jobs:
   # ============================================
+  # CHECK & CREATE BACKEND (if needed)
+  # ============================================
+  setup-backend:
+    name: "🗄️ Setup Backend"
+    runs-on: ubuntu-latest
+    if: inputs.action != 'destroy'
+    outputs:
+      backend_exists: ${{ steps.check.outputs.exists }}
+      backend_created: ${{ steps.create.outputs.created }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔍 Check if Backend Exists
+        id: check
+        run: |
+          BUCKET_NAME="${{ env.TF_VAR_project_name }}-${{ env.TF_VAR_environment }}-terraform-state"
+          
+          if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+            echo "✅ Backend already exists: $BUCKET_NAME"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Backend does not exist: $BUCKET_NAME"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📦 Setup Terraform
+        if: steps.check.outputs.exists == 'false'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: 🏗️ Create Backend
+        id: create
+        if: steps.check.outputs.exists == 'false'
+        working-directory: ${{ env.TF_BOOTSTRAP_DIR }}
+        run: |
+          echo "🚀 Creating Terraform backend..."
+          
+          terraform init
+          terraform apply -auto-approve
+          
+          echo "✅ Backend created successfully!"
+          echo "created=true" >> $GITHUB_OUTPUT
+
+      - name: 📝 Backend Summary
+        run: |
+          echo "## 🗄️ Backend Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check.outputs.exists }}" == "true" ]; then
+            echo "✅ Backend already exists" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🆕 Backend was created" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**S3 Bucket:** ${{ env.TF_VAR_project_name }}-${{ env.TF_VAR_environment }}-terraform-state" >> $GITHUB_STEP_SUMMARY
+          echo "**DynamoDB Table:** ${{ env.TF_VAR_project_name }}-${{ env.TF_VAR_environment }}-terraform-locks" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
   # VALIDATE
   # ============================================
   validate:
-    name: "Terraform Validate"
+    name: "✅ Terraform Validate"
     runs-on: ubuntu-latest
+    needs: setup-backend
     if: inputs.action != 'destroy'
     outputs:
       valid: ${{ steps.validate.outcome == 'success' }}
@@ -73,7 +148,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 🔍 Terraform Init
-        run: terraform init -backend=false
+        run: terraform init
 
       - name: 📝 Terraform Format Check
         id: fmt
@@ -98,7 +173,7 @@ jobs:
   # SECURITY SCAN - CHECKOV
   # ============================================
   security-checkov:
-    name: "Security Scan (Checkov)"
+    name: "🔒 Security Scan (Checkov)"
     runs-on: ubuntu-latest
     needs: validate
     if: inputs.action != 'destroy'
@@ -120,7 +195,7 @@ jobs:
   # SECURITY SCAN - TFSEC
   # ============================================
   security-tfsec:
-    name: "Security Scan (tfsec)"
+    name: "🔒 Security Scan (tfsec)"
     runs-on: ubuntu-latest
     needs: validate
     if: inputs.action != 'destroy'
@@ -139,15 +214,13 @@ jobs:
   # TERRAFORM PLAN
   # ============================================
   plan:
-    name: "Terraform Plan"
+    name: "📋 Terraform Plan"
     runs-on: ubuntu-latest
     needs: [validate, security-checkov, security-tfsec]
     if: |
       always() &&
       needs.validate.result == 'success' &&
       inputs.action != 'destroy'
-    outputs:
-      plan_exitcode: ${{ steps.plan.outputs.exitcode }}
 
     defaults:
       run:
@@ -179,9 +252,8 @@ jobs:
           terraform plan \
             -var="db_password=${{ secrets.DB_PASSWORD }}" \
             -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
-            -detailed-exitcode \
             -out=tfplan \
-            2>&1 | tee plan_output.txt || true
+            2>&1 | tee plan_output.txt
         continue-on-error: true
 
       - name: 📤 Upload Plan
@@ -211,57 +283,19 @@ jobs:
             echo "| ➖ Destroy | $DESTROYS |" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: 💬 Comment on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let output = '';
-            try {
-              output = fs.readFileSync('${{ env.TF_WORKING_DIR }}/plan_output.txt', 'utf8');
-            } catch (e) {
-              output = 'Plan output not available';
-            }
-            
-            const maxLength = 60000;
-            const truncated = output.length > maxLength 
-              ? output.substring(0, maxLength) + '\n... (truncated)'
-              : output;
-            
-            const body = `## 📋 Terraform Plan Results
-            
-            <details>
-            <summary>Show Plan</summary>
-            
-            \`\`\`hcl
-            ${truncated}
-            \`\`\`
-            
-            </details>
-            
-            **Checkov:** ${{ needs.security-checkov.result }}
-            **tfsec:** ${{ needs.security-tfsec.result }}
-            `;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            });
-        continue-on-error: true
-
   # ============================================
   # TERRAFORM APPLY
   # ============================================
   apply:
-    name: "Terraform Apply"
+    name: "🚀 Terraform Apply"
     runs-on: ubuntu-latest
     needs: plan
     if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+      needs.plan.result == 'success' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
+      )
 
     defaults:
       run:
@@ -295,18 +329,22 @@ jobs:
             -auto-approve
 
       - name: 📤 Get Outputs
-        id: outputs
         run: |
-          echo "## 🏗️ Infrastructure Applied" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏗️ Infrastructure Applied Successfully!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| VPC ID | $(terraform output -raw vpc_id 2>/dev/null || echo 'N/A') |" >> $GITHUB_STEP_SUMMARY
-          echo "| EKS Cluster | $(terraform output -raw eks_cluster_name 2>/dev/null || echo 'N/A') |" >> $GITHUB_STEP_SUMMARY
-          echo "| RDS Endpoint | $(terraform output -raw rds_endpoint 2>/dev/null || echo 'N/A') |" >> $GITHUB_STEP_SUMMARY
+          echo "| VPC ID | \`$(terraform output -raw vpc_id 2>/dev/null || echo 'N/A')\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| EKS Cluster | \`$(terraform output -raw eks_cluster_name 2>/dev/null || echo 'N/A')\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| RDS Endpoint | \`$(terraform output -raw rds_endpoint 2>/dev/null || echo 'N/A')\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Connect to EKS:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "aws eks update-kubeconfig --name $(terraform output -raw eks_cluster_name 2>/dev/null || echo 'CLUSTER_NAME') --region ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   # ============================================
-  # TERRAFORM DESTROY
+  # TERRAFORM DESTROY (Protected)
   # ============================================
   destroy:
     name: "💥 Terraform Destroy"
@@ -321,9 +359,11 @@ jobs:
       - name: 🔒 Validate Destroy Confirmation
         run: |
           if [ "${{ inputs.confirm_destroy }}" != "DESTROY" ]; then
-            echo "❌ ERROR: You must type 'DESTROY' in the confirm_destroy field to proceed."
-            echo ""
-            echo "This is a safety measure to prevent accidental destruction."
+            echo "## ❌ Destroy Cancelled" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "You must type **DESTROY** in the confirm_destroy field." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This is a safety measure to prevent accidental destruction." >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
           echo "✅ Destroy confirmed"
@@ -353,21 +393,20 @@ jobs:
       - name: 🗑️ Cleanup Kubernetes Resources
         continue-on-error: true
         run: |
-          echo "Attempting to connect to EKS cluster..."
+          echo "🔗 Connecting to EKS cluster..."
           aws eks update-kubeconfig \
             --name ${{ env.TF_VAR_project_name }}-${{ env.TF_VAR_environment }} \
-            --region ${{ env.AWS_REGION }} || true
+            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Cluster may not exist"
           
-          echo "Deleting LoadBalancer services..."
+          echo "🗑️ Deleting LoadBalancer services..."
           kubectl get svc -A -o json 2>/dev/null | jq -r '.items[] | select(.spec.type=="LoadBalancer") | "\(.metadata.namespace) \(.metadata.name)"' | while read ns name; do
-            echo "  Deleting: $ns/$name"
-            kubectl delete svc $name -n $ns --wait=false 2>/dev/null || true
+            [ -n "$ns" ] && [ -n "$name" ] && kubectl delete svc $name -n $ns --wait=false 2>/dev/null || true
           done
           
-          echo "Waiting 60s for LoadBalancers to be released..."
+          echo "⏳ Waiting 60s for LoadBalancers to be released..."
           sleep 60
           
-          echo "Deleting namespaces..."
+          echo "🗑️ Deleting namespaces..."
           for ns in sonarqube monitoring argocd product-platform; do
             kubectl delete namespace $ns --grace-period=0 --force --wait=false 2>/dev/null || true
           done
@@ -392,28 +431,31 @@ jobs:
         run: |
           echo "## 💥 Infrastructure Destroyed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ✅ Destroyed Resources:" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Destroyed:" >> $GITHUB_STEP_SUMMARY
           echo "- VPC and networking" >> $GITHUB_STEP_SUMMARY
           echo "- EKS cluster and node groups" >> $GITHUB_STEP_SUMMARY
-          echo "- RDS PostgreSQL" >> $GITHUB_STEP_SUMMARY
+          echo "- RDS PostgreSQL (⚠️ DATA LOST)" >> $GITHUB_STEP_SUMMARY
           echo "- RabbitMQ (AmazonMQ)" >> $GITHUB_STEP_SUMMARY
           echo "- Lambda functions" >> $GITHUB_STEP_SUMMARY
           echo "- API Gateway" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔒 Preserved:" >> $GITHUB_STEP_SUMMARY
-          echo "- S3 bucket (Terraform state)" >> $GITHUB_STEP_SUMMARY
-          echo "- DynamoDB table (State locking)" >> $GITHUB_STEP_SUMMARY
-          echo "- ECR images" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔒 Preserved (NEVER deleted):" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ S3 bucket (Terraform state)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ DynamoDB table (State locking)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ ECR images" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 💰 Cost Savings:" >> $GITHUB_STEP_SUMMARY
           echo "- Before: ~\$250/month" >> $GITHUB_STEP_SUMMARY
           echo "- After: ~\$0.50/month" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔄 To Recreate:" >> $GITHUB_STEP_SUMMARY
+          echo "Run this workflow again with action: **apply**" >> $GITHUB_STEP_SUMMARY
 
   # ============================================
   # SECURITY SUMMARY
   # ============================================
   security-summary:
-    name: "Security Summary"
+    name: "📊 Security Summary"
     runs-on: ubuntu-latest
     needs: [security-checkov, security-tfsec, plan]
     if: always() && inputs.action != 'destroy'
@@ -427,5 +469,3 @@ jobs:
           echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Checkov | ${{ needs.security-checkov.result == 'success' && '✅ Passed' || '⚠️ Check findings' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| tfsec | ${{ needs.security-tfsec.result == 'success' && '✅ Passed' || '⚠️ Check findings' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "ℹ️ Security scans run with soft_fail=true. Review findings in logs." >> $GITHUB_STEP_SUMMARY
