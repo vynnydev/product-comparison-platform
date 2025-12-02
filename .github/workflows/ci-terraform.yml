@@ -13,14 +13,14 @@ name: CI - Terraform
 
 on:
   push:
-    branches: [main]
+    branches: [main, development, improvement]
     paths:
       - 'infrastructure/terraform/**'
       - '!infrastructure/terraform/modules/bootstrap/**'
       - '!infrastructure/terraform/modules/backend/**'
       - '.github/workflows/ci-terraform.yml'
   pull_request:
-    branches: [main]
+    branches: [main, development, improvement]
     paths:
       - 'infrastructure/terraform/**'
   workflow_dispatch:
