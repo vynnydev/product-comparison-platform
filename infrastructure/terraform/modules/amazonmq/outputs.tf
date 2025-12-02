@@ -1,39 +1,34 @@
 output "broker_id" {
-  description = "ID do broker Amazon MQ"
+  description = "ID of the Amazon MQ broker"
   value       = aws_mq_broker.rabbitmq.id
 }
 
 output "broker_arn" {
-  description = "ARN do broker Amazon MQ"
+  description = "ARN of the Amazon MQ broker"
   value       = aws_mq_broker.rabbitmq.arn
 }
 
-output "broker_endpoint" {
-  description = "Endpoint do broker (AMQP)"
+output "amqp_endpoint" {
+  description = "AMQP endpoint for applications"
   value       = aws_mq_broker.rabbitmq.instances[0].endpoints[0]
 }
 
-output "broker_console_url" {
-  description = "URL do console de gerenciamento"
+output "console_url" {
+  description = "RabbitMQ Management Console URL"
   value       = aws_mq_broker.rabbitmq.instances[0].console_url
 }
 
 output "security_group_id" {
-  description = "Security Group ID do Amazon MQ"
+  description = "Security group ID"
   value       = aws_security_group.amazonmq.id
 }
 
-output "ssm_endpoint_parameter" {
-  description = "SSM Parameter name para endpoint"
-  value       = aws_ssm_parameter.rabbitmq_endpoint.name
+output "broker_username" {
+  description = "RabbitMQ username"
+  value       = var.broker_username
 }
 
-output "ssm_username_parameter" {
-  description = "SSM Parameter name para username"
-  value       = aws_ssm_parameter.rabbitmq_username.name
-}
-
-output "ssm_password_parameter" {
-  description = "SSM Parameter name para password"
-  value       = aws_ssm_parameter.rabbitmq_password.name
+output "publicly_accessible" {
+  description = "Whether broker is publicly accessible"
+  value       = var.publicly_accessible
 }

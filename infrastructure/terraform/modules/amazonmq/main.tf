@@ -1,6 +1,15 @@
 # ============================================
-# AMAZON MQ (RabbitMQ) FOR PRODUCTION
+# AMAZON MQ (RabbitMQ) FOR DEVELOPMENT
 # ============================================
+
+# Buscar IP público atual (para dev)
+data "http" "my_ip" {
+  url = "https://checkip.amazonaws.com"
+}
+
+locals {
+  my_ip = "${chomp(data.http.my_ip.response_body)}/32"
+}
 
 # Security Group for Amazon MQ
 resource "aws_security_group" "amazonmq" {
@@ -8,7 +17,7 @@ resource "aws_security_group" "amazonmq" {
   description = "Security group for Amazon MQ RabbitMQ broker"
   vpc_id      = var.vpc_id
 
-  # AMQPS port (SSL)
+  # AMQPS port (SSL) from EKS nodes
   ingress {
     from_port       = 5671
     to_port         = 5671
@@ -17,22 +26,41 @@ resource "aws_security_group" "amazonmq" {
     description     = "AMQPS (SSL) from EKS nodes"
   }
 
-  # Permitir da VPC inteira
+  # AMQPS from VPC
   ingress {
     from_port   = 5671
     to_port     = 5671
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.vpc_cidr]
     description = "AMQPS from VPC"
   }
 
-  # Management console (HTTPS)
+  # Management console (HTTPS) from VPC
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
-    description = "RabbitMQ Management Console (HTTPS)"
+    cidr_blocks = [var.vpc_cidr]
+    description = "RabbitMQ Management Console from VPC"
+  }
+
+  # === ACESSO PÚBLICO PARA DESENVOLVIMENTO ===
+  # Management console (HTTPS) from your IP
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = var.publicly_accessible ? [local.my_ip] : []
+    description = "RabbitMQ Management Console from Developer IP"
+  }
+
+  # AMQPS from your IP (if needed)
+  ingress {
+    from_port   = 5671
+    to_port     = 5671
+    protocol    = "tcp"
+    cidr_blocks = var.publicly_accessible ? [local.my_ip] : []
+    description = "AMQPS from Developer IP"
   }
 
   egress {
@@ -58,31 +86,26 @@ resource "aws_security_group" "amazonmq" {
 resource "aws_mq_broker" "rabbitmq" {
   broker_name = "${var.project_name}-${var.environment}-rabbitmq"
 
-  # Engine
   engine_type        = "RabbitMQ"
   engine_version     = "3.13"
   host_instance_type = var.broker_instance_type
   
-  # Deployment
-  deployment_mode = "SINGLE_INSTANCE"  # Use CLUSTER_MULTI_AZ for production
+  deployment_mode = "SINGLE_INSTANCE"
   
-  # Network
-  subnet_ids         = [var.subnet_ids[0]]  # Single AZ for SINGLE_INSTANCE
-  security_groups    = [aws_security_group.amazonmq.id]
-  publicly_accessible = false
+  # === MUDANÇA PRINCIPAL ===
+  subnet_ids          = [var.subnet_ids[0]]
+  security_groups     = [aws_security_group.amazonmq.id]
+  publicly_accessible = var.publicly_accessible  # Variável para controlar
 
-  # Users
   user {
     username = var.broker_username
     password = var.broker_password
   }
 
-  # Logs
   logs {
     general = true
   }
 
-  # Maintenance
   auto_minor_version_upgrade = true
   maintenance_window_start_time {
     day_of_week = "SUNDAY"
@@ -97,7 +120,7 @@ resource "aws_mq_broker" "rabbitmq" {
   }
 }
 
-# SSM Parameter for RabbitMQ endpoint
+# SSM Parameters
 resource "aws_ssm_parameter" "rabbitmq_endpoint" {
   name  = "/${var.project_name}/${var.environment}/rabbitmq/endpoint"
   type  = "String"
@@ -109,7 +132,17 @@ resource "aws_ssm_parameter" "rabbitmq_endpoint" {
   }
 }
 
-# SSM Parameter for RabbitMQ username
+resource "aws_ssm_parameter" "rabbitmq_console_url" {
+  name  = "/${var.project_name}/${var.environment}/rabbitmq/console_url"
+  type  = "String"
+  value = aws_mq_broker.rabbitmq.instances[0].console_url
+
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
 resource "aws_ssm_parameter" "rabbitmq_username" {
   name  = "/${var.project_name}/${var.environment}/rabbitmq/username"
   type  = "String"
@@ -121,7 +154,6 @@ resource "aws_ssm_parameter" "rabbitmq_username" {
   }
 }
 
-# SSM Parameter for RabbitMQ password (SecureString)
 resource "aws_ssm_parameter" "rabbitmq_password" {
   name  = "/${var.project_name}/${var.environment}/rabbitmq/password"
   type  = "SecureString"
