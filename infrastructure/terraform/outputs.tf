@@ -31,24 +31,24 @@ output "availability_zones" {
 # 🐳 ECR OUTPUTS
 # ============================================
 
-output "ecr_repository_urls" {
-  description = "URLs dos repositórios ECR"
-  value       = module.ecr.repository_urls
-}
-
-output "ecr_repository_arns" {
-  description = "ARNs dos repositórios ECR"
-  value       = module.ecr.repository_arns
-}
-
 output "ecr_product_service_url" {
-  description = "URL do repositório ECR do product-service"
+  description = "ECR URL for Product Service"
   value       = module.ecr.product_service_url
 }
 
 output "ecr_ai_service_url" {
-  description = "URL do repositório ECR do ai-service"
+  description = "ECR URL for AI Service"
   value       = module.ecr.ai_service_url
+}
+
+output "ecr_frontend_url" {
+  description = "ECR URL for Frontend"
+  value       = module.ecr.frontend_url
+}
+
+output "ecr_repository_urls" {
+  description = "All ECR repository URLs"
+  value       = module.ecr.repository_urls
 }
 
 # ============================================
@@ -334,50 +334,6 @@ output "ai_health_url" {
 output "lambda_ai_function_name" {
   description = "Lambda function name"
   value       = module.lambda_ai.function_name
-}
-
-# ============================================
-# ECR OUTPUTS
-# ============================================
-output "ecr_product_service_url" {
-  description = "ECR URL for Product Service"
-  value       = module.ecr.product_service_url
-}
-
-output "ecr_ai_service_url" {
-  description = "ECR URL for AI Service"
-  value       = module.ecr.ai_service_url
-}
-
-output "ecr_frontend_url" {
-  description = "ECR URL for Frontend"
-  value       = module.ecr.frontend_url
-}
-
-output "ecr_repository_urls" {
-  description = "All ECR repository URLs"
-  value       = module.ecr.repository_urls
-}
-
-# ============================================
-# ALB CONTROLLER OUTPUTS
-# ============================================
-output "alb_controller_role_arn" {
-  description = "IAM Role ARN for AWS Load Balancer Controller"
-  value       = module.alb_controller.iam_role_arn
-}
-
-output "alb_controller_status" {
-  description = "Helm release status for AWS Load Balancer Controller"
-  value       = module.alb_controller.helm_release_status
-}
-
-# ============================================
-# ECR OUTPUTS - FRONTEND
-# ============================================
-output "ecr_frontend_url" {
-  description = "ECR URL for Frontend"
-  value       = module.ecr.frontend_url
 }
 
 # ============================================
