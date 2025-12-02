@@ -7,7 +7,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-K8S_DIR="${SCRIPT_DIR}/../k8s/sonarqube"
+K8S_DIR="../../k8s/devops"
 
 echo "============================================"
 echo "  Installing SonarQube"

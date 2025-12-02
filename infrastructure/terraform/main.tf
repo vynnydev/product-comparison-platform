@@ -1,4 +1,15 @@
 # ============================================
+# LOCALS
+# ============================================
+locals {
+  common_tags = {
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+# ============================================
 # VPC Module - Development Environment
 # ============================================
 module "vpc" {
@@ -51,7 +62,6 @@ module "eks" {
 # ============================================
 # AMAZON MQ (RABBITMQ)
 # ============================================
-
 module "amazonmq" {
   source = "./modules/amazonmq"
 
@@ -71,7 +81,6 @@ module "amazonmq" {
 # ============================================
 # RDS POSTGRESQL
 # ============================================
-
 module "rds" {
   source = "./modules/rds"
 
@@ -132,10 +141,6 @@ module "lambda_ai" {
   enable_bedrock   = true
   bedrock_model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"
 
-  # Optional: Deploy in VPC
-  # vpc_id             = module.vpc.vpc_id
-  # private_subnet_ids = module.vpc.private_subnet_ids
-
   tags = local.common_tags
 }
 
@@ -188,4 +193,50 @@ module "api_gateway_ai" {
   }
 
   tags = local.common_tags
+}
+
+# ============================================
+# AWS LOAD BALANCER CONTROLLER
+# Enables ALB/NLB Ingress for Kubernetes
+# ============================================
+module "alb_controller" {
+  source = "./modules/alb-controller"
+
+  project_name         = var.project_name
+  environment          = var.environment
+  cluster_name         = module.eks.cluster_name
+  vpc_id               = module.vpc.vpc_id
+  create_oidc_provider = false  # EKS module já cria o OIDC provider
+  oidc_provider_arn    = module.eks.oidc_provider_arn
+
+  depends_on = [module.eks]
+}
+
+# ============================================
+# ROUTE 53 - DNS
+# ============================================
+module "route53" {
+  source = "./modules/route53"
+
+  project_name = var.project_name
+  environment  = var.environment
+  domain_name  = var.domain_name
+
+  # Deixar vazio inicialmente - atualizar depois que o ALB for criado
+  alb_dns_name = ""
+  alb_zone_id  = ""
+}
+
+# ============================================
+# ACM - SSL CERTIFICATE
+# ============================================
+module "acm" {
+  source = "./modules/acm"
+
+  project_name    = var.project_name
+  environment     = var.environment
+  domain_name     = var.domain_name
+  route53_zone_id = module.route53.zone_id
+
+  depends_on = [module.route53]
 }

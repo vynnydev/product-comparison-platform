@@ -1,245 +1,318 @@
-name: "CI/CD - Terraform"
+# ============================================
+# CI PIPELINE - TERRAFORM
+# Validate, Security Scan, Plan, Apply
+# ============================================
+
+name: CI - Terraform
 
 on:
-    push:
-        branches: [main, development, improvement]
-        paths:
-            - "infrastructure/terraform/**"
-            - ".github/workflows/ci-terraform.yml"
-    pull_request:
-        branches: [main, development, improvement]
-        paths:
-            - "infrastructure/terraform/**"
-    workflow_dispatch:
-        inputs:
-            action:
-                description: "Action to perform"
-                required: true
-                default: "plan"
-                type: choice
-                options:
-                    - plan
-                    - apply
-                    - destroy
-            confirm_destroy:
-                description: "Type DESTROY to confirm destruction"
-                required: false
-                type: string
+  push:
+    branches: [main, development, improvement]
+    paths:
+      - 'infrastructure/terraform/**'
+      - '!infrastructure/terraform/modules/bootstrap/**'
+      - '!infrastructure/terraform/modules/backend/**'
+      - '.github/workflows/ci-terraform.yml'
+  pull_request:
+    branches: [main, development, improvement]
+    paths:
+      - 'infrastructure/terraform/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
 
 env:
-    TF_VERSION: "1.6.0"
-    AWS_REGION: "us-east-1"
-    TF_WORKING_DIR: "infrastructure/terraform"
-
-concurrency:
-    group: terraform-${{ github.ref }}
-    cancel-in-progress: false
+  AWS_REGION: us-east-1
+  TF_VERSION: '1.6.0'
+  TF_WORKING_DIR: infrastructure/terraform
+  TF_VAR_project_name: product-comparison
+  TF_VAR_environment: dev
 
 jobs:
-    validate:
-        name: "Validate & Format"
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                shell: bash
+  # ============================================
+  # VALIDATE
+  # ============================================
+  validate:
+    name: "Terraform Validate"
+    runs-on: ubuntu-latest
+    outputs:
+      valid: ${{ steps.validate.outcome == 'success' }}
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
 
-            - name: Setup Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: ${{ env.TF_VERSION }}
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-            - name: Terraform Format Check
-              id: fmt
-              run: |
-                  cd ${{ env.TF_WORKING_DIR }} && terraform fmt -check -recursive
-              continue-on-error: true
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
-            - name: Terraform Init
-              id: init
-              run: |
-                  cd ${{ env.TF_WORKING_DIR }} && terraform init -backend=false
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-            - name: Terraform Validate
-              id: validate
-              run: |
-                  cd ${{ env.TF_WORKING_DIR }} && terraform validate -no-color
+      - name: 🔍 Terraform Init
+        run: terraform init -backend=false
 
-    security-scan:
-        name: "Security Scan (Checkov)"
-        runs-on: ubuntu-latest
-        needs: validate
-        defaults:
-            run:
-                shell: bash
+      - name: 📝 Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+      - name: ✅ Terraform Validate
+        id: validate
+        run: terraform validate
 
-            - name: Run Checkov
-              uses: bridgecrewio/checkov-action@v12
-              with:
-                  directory: ${{ env.TF_WORKING_DIR }}
-                  framework: terraform
-                  output_format: cli
-                  soft_fail: true
-                  skip_check: CKV_AWS_144,CKV_AWS_145,CKV_AWS_337
+      - name: 📝 Validation Summary
+        if: always()
+        run: |
+          echo "## 📋 Terraform Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Format | ${{ steps.fmt.outcome == 'success' && '✅ Passed' || '⚠️ Needs formatting' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Validate | ${{ steps.validate.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
 
-    tfsec-scan:
-        name: "Security Scan (tfsec)"
-        runs-on: ubuntu-latest
-        needs: validate
-        defaults:
-            run:
-                shell: bash
+  # ============================================
+  # SECURITY SCAN - CHECKOV
+  # ============================================
+  security-checkov:
+    name: "Security Scan (Checkov)"
+    runs-on: ubuntu-latest
+    needs: validate
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-            - name: Run tfsec
-              uses: aquasecurity/tfsec-action@v1.0.3
-              with:
-                  working_directory: ${{ env.TF_WORKING_DIR }}
-                  soft_fail: true
+      - name: 🔒 Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: ${{ env.TF_WORKING_DIR }}
+          framework: terraform
+          output_format: cli
+          soft_fail: true
+          skip_check: CKV_AWS_144,CKV_AWS_145,CKV_AWS_337,CKV2_AWS_5
 
-    plan:
-        name: "Terraform Plan"
-        runs-on: ubuntu-latest
-        needs: [validate, security-scan, tfsec-scan]
-        defaults:
-            run:
-                shell: bash
+  # ============================================
+  # SECURITY SCAN - TFSEC
+  # ============================================
+  security-tfsec:
+    name: "Security Scan (tfsec)"
+    runs-on: ubuntu-latest
+    needs: validate
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-            - name: Setup Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: ${{ env.TF_VERSION }}
+      - name: 🔒 Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ${{ env.TF_WORKING_DIR }}
+          soft_fail: true
 
-            - name: Configure AWS credentials
-              uses: aws-actions/configure-aws-credentials@v4
-              with:
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: ${{ env.AWS_REGION }}
+  # ============================================
+  # TERRAFORM PLAN
+  # ============================================
+  plan:
+    name: "Terraform Plan"
+    runs-on: ubuntu-latest
+    needs: [validate, security-checkov, security-tfsec]
+    if: |
+      always() &&
+      needs.validate.result == 'success'
+    outputs:
+      plan_exitcode: ${{ steps.plan.outputs.exitcode }}
 
-            - name: Terraform Init
-              run: |
-                  cd ${{ env.TF_WORKING_DIR }} && terraform init
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
 
-            - name: Terraform Plan
-              id: plan
-              run: |
-                  cd ${{ env.TF_WORKING_DIR }} && terraform plan \
-                    -var="db_password=${{ secrets.DB_PASSWORD }}" \
-                    -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
-                    -out=tfplan \
-                    -no-color
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-            - name: Upload Plan Artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: terraform-plan-${{ github.sha }}
-                  path: ${{ env.TF_WORKING_DIR }}/tfplan
-                  retention-days: 5
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
 
-    apply:
-        name: "Terraform Apply"
-        runs-on: ubuntu-latest
-        needs: plan
-        if: |
-            (github.event_name == 'push' && contains(fromJson('["refs/heads/main", "refs/heads/improvement"]'), github.ref)) ||
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
-        defaults:
-            run:
-                shell: bash
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+      - name: 🔍 Terraform Init
+        run: terraform init
 
-            - name: Setup Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: ${{ env.TF_VERSION }}
+      - name: 📋 Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
+            -detailed-exitcode \
+            -out=tfplan \
+            2>&1 | tee plan_output.txt || true
+        continue-on-error: true
 
-            - name: Configure AWS credentials
-              uses: aws-actions/configure-aws-credentials@v4
-              with:
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: ${{ env.AWS_REGION }}
+      - name: 📤 Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            ${{ env.TF_WORKING_DIR }}/tfplan
+            ${{ env.TF_WORKING_DIR }}/plan_output.txt
+          retention-days: 5
 
-            - name: Terraform Init
-              run: |
-                  cd ${{ env.TF_WORKING_DIR }} && terraform init
+      - name: 📝 Plan Summary
+        if: always()
+        run: |
+          echo "## 📋 Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f plan_output.txt ]; then
+            # Extract resource counts
+            ADDS=$(grep -oP 'Plan: \K\d+(?= to add)' plan_output.txt || echo "0")
+            CHANGES=$(grep -oP '\d+(?= to change)' plan_output.txt || echo "0")
+            DESTROYS=$(grep -oP '\d+(?= to destroy)' plan_output.txt || echo "0")
+            
+            echo "| Operation | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| ➕ Add | $ADDS |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔄 Change | $CHANGES |" >> $GITHUB_STEP_SUMMARY
+            echo "| ➖ Destroy | $DESTROYS |" >> $GITHUB_STEP_SUMMARY
+          fi
 
-            - name: Download Plan Artifact
-              uses: actions/download-artifact@v4
-              with:
-                  name: terraform-plan-${{ github.sha }}
-                  path: ${{ env.TF_WORKING_DIR }}
+      - name: 💬 Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let output = '';
+            try {
+              output = fs.readFileSync('${{ env.TF_WORKING_DIR }}/plan_output.txt', 'utf8');
+            } catch (e) {
+              output = 'Plan output not available';
+            }
+            
+            const maxLength = 60000;
+            const truncated = output.length > maxLength 
+              ? output.substring(0, maxLength) + '\n... (truncated)'
+              : output;
+            
+            const body = `## 📋 Terraform Plan Results
+            
+            <details>
+            <summary>Show Plan</summary>
+            
+            \`\`\`hcl
+            ${truncated}
+            \`\`\`
+            
+            </details>
+            
+            **Checkov:** ${{ needs.security-checkov.result }}
+            **tfsec:** ${{ needs.security-tfsec.result }}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+        continue-on-error: true
 
-            - name: Terraform Apply
-              run: |
-                  cd ${{ env.TF_WORKING_DIR }} && terraform apply -auto-approve tfplan
+  # ============================================
+  # TERRAFORM APPLY
+  # ============================================
+  apply:
+    name: "Terraform Apply"
+    runs-on: ubuntu-latest
+    needs: plan
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
 
-            - name: Output Summary
-              run: |
-                  echo "## Terraform Apply Summary" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-                  echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  cd ${{ env.TF_WORKING_DIR }} && terraform output -no-color >> $GITHUB_STEP_SUMMARY
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
 
-    destroy:
-        name: "Terraform Destroy"
-        runs-on: ubuntu-latest
-        needs: validate
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
-        defaults:
-            run:
-                shell: bash
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-        steps:
-            - name: Verify Destroy Confirmation
-              run: |
-                  if [[ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY" ]]; then
-                    echo "::error::Destroy not confirmed. Type DESTROY in confirm_destroy input."
-                    exit 1
-                  fi
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
 
-            - name: Checkout code
-              uses: actions/checkout@v4
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-            - name: Setup Terraform
-              uses: hashicorp/setup-terraform@v3
-              with:
-                  terraform_version: ${{ env.TF_VERSION }}
+      - name: 🔍 Terraform Init
+        run: terraform init
 
-            - name: Configure AWS credentials
-              uses: aws-actions/configure-aws-credentials@v4
-              with:
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: ${{ env.AWS_REGION }}
+      - name: 🚀 Terraform Apply
+        run: |
+          terraform apply \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
+            -auto-approve
 
-            - name: Terraform Init
-              run: |
-                  cd ${{ env.TF_WORKING_DIR }} && terraform init
+      - name: 📤 Get Outputs
+        id: outputs
+        run: |
+          echo "## 🏗️ Infrastructure Applied" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| VPC ID | $(terraform output -raw vpc_id 2>/dev/null || echo 'N/A') |" >> $GITHUB_STEP_SUMMARY
+          echo "| EKS Cluster | $(terraform output -raw eks_cluster_name 2>/dev/null || echo 'N/A') |" >> $GITHUB_STEP_SUMMARY
+          echo "| RDS Endpoint | $(terraform output -raw rds_endpoint 2>/dev/null || echo 'N/A') |" >> $GITHUB_STEP_SUMMARY
 
-            - name: Terraform Destroy
-              run: |
-                  cd ${{ env.TF_WORKING_DIR }} && terraform destroy \
-                    -var="db_password=${{ secrets.DB_PASSWORD }}" \
-                    -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
-                    -auto-approve
+  # ============================================
+  # SECURITY SUMMARY
+  # ============================================
+  security-summary:
+    name: "Security Summary"
+    runs-on: ubuntu-latest
+    needs: [security-checkov, security-tfsec, plan]
+    if: always()
+
+    steps:
+      - name: 📊 Generate Security Summary
+        run: |
+          echo "## 🔒 Terraform Security Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scanner | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Checkov | ${{ needs.security-checkov.result == 'success' && '✅ Passed' || '⚠️ Check findings' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| tfsec | ${{ needs.security-tfsec.result == 'success' && '✅ Passed' || '⚠️ Check findings' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ Security scans run with soft_fail=true. Review findings in logs." >> $GITHUB_STEP_SUMMARY

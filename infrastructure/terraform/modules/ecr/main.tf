@@ -5,7 +5,8 @@
 locals {
   repositories = [
     "product-service",
-    "ai-service"
+    "ai-service",
+    "frontend"  # NEW: Added frontend repository
   ]
 }
 

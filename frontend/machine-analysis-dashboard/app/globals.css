@@ -1,0 +1,299 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Enhanced light mode colors based on login page */
+  --background: oklch(0.99 0.005 240);
+  --foreground: oklch(0.15 0.01 252);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.01 252);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.01 252);
+  --primary: oklch(0.55 0.18 240);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.01 240);
+  --secondary-foreground: oklch(0.15 0.01 252);
+  --muted: oklch(0.96 0.01 240);
+  --muted-foreground: oklch(0.48 0.01 252);
+  --accent: oklch(0.65 0.2 200);
+  --accent-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.92 0.01 240);
+  --input: oklch(0.92 0.01 240);
+  --ring: oklch(0.55 0.18 240);
+  --chart-1: oklch(0.55 0.18 240);
+  --chart-2: oklch(0.65 0.2 200);
+  --chart-3: oklch(0.6 0.22 180);
+  --chart-4: oklch(0.7 0.18 35);
+  --chart-5: oklch(0.58 0.22 280);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.18 0 0);
+  --sidebar-primary: oklch(0.47 0.14 252);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.94 0.01 252);
+  --sidebar-accent-foreground: oklch(0.18 0 0);
+  --sidebar-border: oklch(0.88 0.01 252);
+  --sidebar-ring: oklch(0.47 0.14 252);
+}
+
+.dark {
+  /* Enhanced dark mode with vibrant gradients */
+  --background: oklch(0.09 0.02 240);
+  --foreground: oklch(0.98 0.005 240);
+  --card: oklch(0.13 0.02 240);
+  --card-foreground: oklch(0.98 0.005 240);
+  --popover: oklch(0.14 0.02 240);
+  --popover-foreground: oklch(0.98 0.005 240);
+  --primary: oklch(0.65 0.24 240);
+  --primary-foreground: oklch(0.09 0.02 240);
+  --secondary: oklch(0.22 0.03 240);
+  --secondary-foreground: oklch(0.98 0.005 240);
+  --muted: oklch(0.2 0.03 240);
+  --muted-foreground: oklch(0.68 0.02 240);
+  --accent: oklch(0.72 0.22 200);
+  --accent-foreground: oklch(0.09 0.02 240);
+  --destructive: oklch(0.58 0.26 27);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.24 0.03 240);
+  --input: oklch(0.24 0.03 240);
+  --ring: oklch(0.65 0.24 240);
+  --chart-1: oklch(0.68 0.26 240);
+  --chart-2: oklch(0.72 0.22 200);
+  --chart-3: oklch(0.7 0.26 180);
+  --chart-4: oklch(0.78 0.22 35);
+  --chart-5: oklch(0.68 0.26 280);
+  --success: oklch(0.7 0.22 145);
+  --success-foreground: oklch(0.09 0.02 240);
+  --warning: oklch(0.78 0.2 75);
+  --warning-foreground: oklch(0.09 0.02 240);
+  --info: oklch(0.68 0.24 220);
+  --info-foreground: oklch(0.09 0.02 240);
+  --sidebar: oklch(0.14 0.015 252);
+  --sidebar-foreground: oklch(0.98 0.005 240);
+  --sidebar-primary: oklch(0.62 0.22 250);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.22 0.03 240);
+  --sidebar-accent-foreground: oklch(0.98 0.005 240);
+  --sidebar-border: oklch(0.24 0.03 240);
+  --sidebar-ring: oklch(0.65 0.24 240);
+}
+
+@theme inline {
+  --font-sans: "Geist", "Geist Fallback";
+  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Adding custom scrollbar styles for smooth, discrete scrolling */
+@layer utilities {
+  /* Custom scrollbar styling for webkit browsers */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: oklch(0.62 0.22 250 / 0.2);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+
+  .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+    background: oklch(0.62 0.22 250 / 0.4);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.62 0.22 250 / 0.6);
+  }
+
+  /* Firefox scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.62 0.22 250 / 0.2) transparent;
+  }
+
+  .scrollbar-thin:hover {
+    scrollbar-color: oklch(0.62 0.22 250 / 0.4) transparent;
+  }
+
+  /* Smooth scrolling behavior */
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+
+  /* Adding custom animations for login page */
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes spin-slow-reverse {
+    from {
+      transform: rotate(360deg);
+    }
+    to {
+      transform: rotate(0deg);
+    }
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow 8s linear infinite;
+  }
+
+  .animate-spin-slow-reverse {
+    animation: spin-slow-reverse 6s linear infinite;
+  }
+
+  /* Adding flow animation for production lines */
+  @keyframes flow {
+    0% {
+      left: 0%;
+      width: 0%;
+    }
+    50% {
+      left: 0%;
+      width: 50%;
+    }
+    100% {
+      left: 50%;
+      width: 0%;
+    }
+  }
+
+  @keyframes ping {
+    75%, 100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+
+  .animate-flow {
+    animation: flow 3s ease-in-out infinite;
+  }
+}
+
+/* Adding Mapbox GL custom popup styling */
+/* Custom Mapbox Popup Styling */
+.mapboxgl-custom-popup .mapboxgl-popup-content {
+  @apply bg-card text-card-foreground p-0 rounded-lg shadow-xl border border-border;
+  padding: 0;
+}
+
+.mapboxgl-custom-popup .mapboxgl-popup-close-button {
+  font-size: 20px;
+  padding: 8px;
+  right: 4px;
+  top: 4px;
+  color: var(--muted-foreground);
+  transition: all 0.2s;
+}
+
+.mapboxgl-custom-popup .mapboxgl-popup-close-button:hover {
+  background-color: var(--muted);
+  color: var(--foreground);
+}
+
+.mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
+  border-bottom-color: var(--card);
+  border-top-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+
+.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip {
+  border-top-color: var(--card);
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+
+.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: var(--card);
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+}
+
+.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: var(--card);
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-right-color: transparent;
+}
+
+/* Mapbox attribution and controls styling */
+.mapboxgl-ctrl-attrib {
+  @apply bg-card/80 text-xs;
+}
+
+.mapboxgl-ctrl-logo {
+  @apply opacity-50;
+}
+
+/* Remove Mapbox default marker */
+.mapboxgl-marker {
+  cursor: pointer;
+}

@@ -18,6 +18,12 @@ output "ai_service_url" {
   value       = aws_ecr_repository.services["ai-service"].repository_url
 }
 
+# NEW: Frontend repository URL
+output "frontend_url" {
+  description = "URL do repositório frontend"
+  value       = aws_ecr_repository.services["frontend"].repository_url
+}
+
 # Mantendo compatibilidade com outputs antigos
 output "repository_url" {
   description = "URL do repositório principal (product-service)"

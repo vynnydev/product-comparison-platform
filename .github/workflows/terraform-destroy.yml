@@ -1,0 +1,187 @@
+# ============================================
+# TERRAFORM DESTROY - INFRASTRUCTURE
+# ============================================
+# Destroys main infrastructure while PRESERVING the backend.
+# This allows you to recreate everything later.
+#
+# ⚠️ REQUIRES CONFIRMATION: Type "DESTROY" exactly
+# ============================================
+
+name: Terraform - Destroy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm'
+        required: true
+        type: string
+      environment:
+        description: 'Environment to destroy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      destroy_k8s_first:
+        description: 'Delete Kubernetes resources first?'
+        required: true
+        default: true
+        type: boolean
+
+env:
+  AWS_REGION: us-east-1
+  TF_VAR_project_name: product-comparison
+  TF_VAR_environment: ${{ inputs.environment }}
+
+jobs:
+  # ============================================
+  # VALIDATION
+  # ============================================
+  validate:
+    name: "Validate Destruction Request"
+    runs-on: ubuntu-latest
+    outputs:
+      confirmed: ${{ steps.check.outputs.confirmed }}
+    
+    steps:
+      - name: 🔒 Check Confirmation
+        id: check
+        run: |
+          if [ "${{ inputs.confirm_destroy }}" == "DESTROY" ]; then
+            echo "confirmed=true" >> $GITHUB_OUTPUT
+            echo "✅ Destruction confirmed"
+          else
+            echo "confirmed=false" >> $GITHUB_OUTPUT
+            echo "❌ Destruction NOT confirmed. You must type 'DESTROY' exactly."
+            exit 1
+          fi
+
+  # ============================================
+  # CLEANUP KUBERNETES (Optional)
+  # ============================================
+  cleanup-k8s:
+    name: "Cleanup Kubernetes Resources"
+    runs-on: ubuntu-latest
+    needs: validate
+    if: inputs.destroy_k8s_first == true
+
+    steps:
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔧 Setup kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: 🔗 Configure kubectl
+        continue-on-error: true
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ env.TF_VAR_project_name }}-${{ inputs.environment }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: 🗑️ Delete LoadBalancer Services First
+        continue-on-error: true
+        run: |
+          echo "Deleting LoadBalancer services to release AWS resources..."
+          
+          # Delete all LoadBalancer services
+          kubectl get svc -A -o json | jq -r '.items[] | select(.spec.type=="LoadBalancer") | "\(.metadata.namespace) \(.metadata.name)"' | while read ns name; do
+            echo "Deleting LoadBalancer: $ns/$name"
+            kubectl delete svc $name -n $ns --wait=false || true
+          done
+          
+          echo "Waiting 60s for LoadBalancers to be released..."
+          sleep 60
+
+      - name: 🗑️ Delete Namespaces
+        continue-on-error: true
+        run: |
+          echo "Deleting namespaces..."
+          for ns in sonarqube monitoring argocd product-platform; do
+            echo "Deleting namespace: $ns"
+            kubectl delete namespace $ns --grace-period=0 --force --wait=false || true
+          done
+          
+          echo "Waiting 30s for namespaces cleanup..."
+          sleep 30
+
+  # ============================================
+  # DESTROY INFRASTRUCTURE
+  # ============================================
+  destroy:
+    name: "Destroy Terraform Infrastructure"
+    runs-on: ubuntu-latest
+    needs: [validate, cleanup-k8s]
+    if: |
+      always() && 
+      needs.validate.outputs.confirmed == 'true' &&
+      (needs.cleanup-k8s.result == 'success' || needs.cleanup-k8s.result == 'skipped')
+
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: 🔍 Terraform Init
+        run: terraform init
+
+      - name: 📋 Terraform Plan Destroy
+        run: |
+          terraform plan -destroy \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
+            -out=destroy.tfplan
+
+      - name: 💥 Terraform Destroy
+        run: terraform apply -auto-approve destroy.tfplan
+
+      - name: 📝 Summary
+        run: |
+          echo "## 💥 Infrastructure Destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Destroyed:" >> $GITHUB_STEP_SUMMARY
+          echo "- VPC and networking" >> $GITHUB_STEP_SUMMARY
+          echo "- EKS cluster and node groups" >> $GITHUB_STEP_SUMMARY
+          echo "- RDS PostgreSQL" >> $GITHUB_STEP_SUMMARY
+          echo "- RabbitMQ (AmazonMQ)" >> $GITHUB_STEP_SUMMARY
+          echo "- ECR repositories (images preserved)" >> $GITHUB_STEP_SUMMARY
+          echo "- Lambda functions" >> $GITHUB_STEP_SUMMARY
+          echo "- API Gateway" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔒 Preserved:" >> $GITHUB_STEP_SUMMARY
+          echo "- S3 bucket (Terraform state)" >> $GITHUB_STEP_SUMMARY
+          echo "- DynamoDB table (State locking)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 💰 Cost Savings:" >> $GITHUB_STEP_SUMMARY
+          echo "- Before: ~\$220/month" >> $GITHUB_STEP_SUMMARY
+          echo "- After: ~\$0.50/month (S3 storage only)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔄 To Recreate:" >> $GITHUB_STEP_SUMMARY
+          echo "Run the 'Terraform - Apply Infrastructure' workflow" >> $GITHUB_STEP_SUMMARY

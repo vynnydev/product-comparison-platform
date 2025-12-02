@@ -1,0 +1,106 @@
+# ============================================
+# TERRAFORM BOOTSTRAP - CREATE BACKEND
+# ============================================
+# Uses the existing modules/bootstrap to create S3 + DynamoDB
+#
+# RUN THIS FIRST (only once per environment)
+# ============================================
+
+name: Terraform - Bootstrap Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  TF_VAR_project_name: product-comparison
+  TF_VAR_environment: ${{ inputs.environment }}
+  TF_VAR_aws_region: us-east-1
+
+jobs:
+  bootstrap:
+    name: "Bootstrap Terraform Backend"
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: infrastructure/terraform/modules/bootstrap
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: 🔍 Check if Backend Exists
+        id: check-backend
+        run: |
+          BUCKET_NAME="${{ env.TF_VAR_project_name }}-${{ inputs.environment }}-terraform-state"
+          if aws s3 ls "s3://$BUCKET_NAME" 2>&1 | grep -q 'NoSuchBucket'; then
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Backend does not exist"
+          else
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Backend already exists: $BUCKET_NAME"
+          fi
+
+      - name: 🔍 Terraform Init
+        run: terraform init
+
+      - name: 📋 Terraform Plan
+        if: inputs.action == 'plan' || inputs.action == 'apply'
+        run: terraform plan -out=tfplan
+
+      - name: 🚀 Terraform Apply
+        if: inputs.action == 'apply'
+        run: terraform apply -auto-approve tfplan
+
+      - name: 💥 Terraform Destroy
+        if: inputs.action == 'destroy'
+        run: |
+          echo "⚠️ WARNING: Destroying Terraform backend!"
+          echo "This will delete the state file and all infrastructure tracking!"
+          terraform destroy -auto-approve
+
+      - name: 📝 Summary
+        if: inputs.action == 'apply'
+        run: |
+          echo "## ✅ Terraform Backend Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Resources:" >> $GITHUB_STEP_SUMMARY
+          echo "- **S3 Bucket:** ${{ env.TF_VAR_project_name }}-${{ inputs.environment }}-terraform-state" >> $GITHUB_STEP_SUMMARY
+          echo "- **DynamoDB Table:** ${{ env.TF_VAR_project_name }}-${{ inputs.environment }}-terraform-locks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Uncomment backend.tf in infrastructure/terraform/" >> $GITHUB_STEP_SUMMARY
+          echo "2. Run: \`terraform init -migrate-state\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Run the 'Terraform - Apply Infrastructure' workflow" >> $GITHUB_STEP_SUMMARY
