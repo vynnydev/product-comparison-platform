@@ -6,7 +6,7 @@
 # - Auto-detects and creates backend if missing
 # - Plan/Apply/Destroy infrastructure
 # - NEVER destroys backend (S3 + DynamoDB)
-# - Works on any branch via manual trigger
+# - Auto-apply on main, manual approval on other branches
 # ============================================
 
 name: CI - Terraform
@@ -221,6 +221,8 @@ jobs:
       always() &&
       needs.validate.result == 'success' &&
       inputs.action != 'destroy'
+    outputs:
+      has_changes: ${{ steps.plan.outputs.has_changes }}
 
     defaults:
       run:
@@ -253,8 +255,21 @@ jobs:
             -var="db_password=${{ secrets.DB_PASSWORD }}" \
             -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
             -out=tfplan \
-            2>&1 | tee plan_output.txt
-        continue-on-error: true
+            -detailed-exitcode \
+            2>&1 | tee plan_output.txt || EXIT_CODE=$?
+          
+          # Exit code 0 = no changes, 1 = error, 2 = changes present
+          if [ "${EXIT_CODE:-0}" -eq 2 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "✅ Plan has changes to apply"
+          elif [ "${EXIT_CODE:-0}" -eq 0 ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No changes detected"
+          else
+            echo "❌ Plan failed"
+            exit 1
+          fi
+        continue-on-error: false
 
       - name: 📤 Upload Plan
         uses: actions/upload-artifact@v4
@@ -269,6 +284,9 @@ jobs:
         if: always()
         run: |
           echo "## 📋 Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -f plan_output.txt ]; then
@@ -290,10 +308,11 @@ jobs:
     name: "🚀 Terraform Apply"
     runs-on: ubuntu-latest
     needs: plan
+    # CORREÇÃO: Agora aplica em QUALQUER branch configurada (push) ou via workflow_dispatch
     if: |
       needs.plan.result == 'success' &&
       (
-        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'push' && github.ref_name != '' && github.event.pull_request == null) ||
         (github.event_name == 'workflow_dispatch' && inputs.action == 'apply')
       )
 
@@ -321,22 +340,43 @@ jobs:
       - name: 🔍 Terraform Init
         run: terraform init
 
+      - name: 📥 Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}
+
       - name: 🚀 Terraform Apply
         run: |
-          terraform apply \
-            -var="db_password=${{ secrets.DB_PASSWORD }}" \
-            -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
-            -auto-approve
+          echo "🚀 Applying Terraform changes..."
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo ""
+          
+          if [ -f tfplan ]; then
+            echo "📋 Using saved plan file..."
+            terraform apply -auto-approve tfplan
+          else
+            echo "📋 Running fresh apply..."
+            terraform apply \
+              -var="db_password=${{ secrets.DB_PASSWORD }}" \
+              -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
+              -auto-approve
+          fi
 
       - name: 📤 Get Outputs
+        id: outputs
         run: |
           echo "## 🏗️ Infrastructure Applied Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| VPC ID | \`$(terraform output -raw vpc_id 2>/dev/null || echo 'N/A')\` |" >> $GITHUB_STEP_SUMMARY
           echo "| EKS Cluster | \`$(terraform output -raw eks_cluster_name 2>/dev/null || echo 'N/A')\` |" >> $GITHUB_STEP_SUMMARY
           echo "| RDS Endpoint | \`$(terraform output -raw rds_endpoint 2>/dev/null || echo 'N/A')\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| RabbitMQ Console | \`$(terraform output -raw rabbitmq_console_url 2>/dev/null || echo 'N/A')\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔧 Connect to EKS:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
