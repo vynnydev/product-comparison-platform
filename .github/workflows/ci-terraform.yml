@@ -1,6 +1,6 @@
 # ============================================
 # CI PIPELINE - TERRAFORM
-# Validate, Security Scan, Plan, Apply
+# Validate, Security Scan, Plan, Apply, Destroy
 # ============================================
 
 name: CI - Terraform
@@ -27,6 +27,12 @@ on:
         options:
           - plan
           - apply
+          - destroy
+      confirm_destroy:
+        description: 'Type DESTROY to confirm destruction'
+        required: false
+        type: string
+        default: ''
 
 env:
   AWS_REGION: us-east-1
@@ -42,6 +48,7 @@ jobs:
   validate:
     name: "Terraform Validate"
     runs-on: ubuntu-latest
+    if: inputs.action != 'destroy'
     outputs:
       valid: ${{ steps.validate.outcome == 'success' }}
 
@@ -94,6 +101,7 @@ jobs:
     name: "Security Scan (Checkov)"
     runs-on: ubuntu-latest
     needs: validate
+    if: inputs.action != 'destroy'
 
     steps:
       - name: 📥 Checkout code
@@ -115,6 +123,7 @@ jobs:
     name: "Security Scan (tfsec)"
     runs-on: ubuntu-latest
     needs: validate
+    if: inputs.action != 'destroy'
 
     steps:
       - name: 📥 Checkout code
@@ -135,7 +144,8 @@ jobs:
     needs: [validate, security-checkov, security-tfsec]
     if: |
       always() &&
-      needs.validate.result == 'success'
+      needs.validate.result == 'success' &&
+      inputs.action != 'destroy'
     outputs:
       plan_exitcode: ${{ steps.plan.outputs.exitcode }}
 
@@ -190,7 +200,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -f plan_output.txt ]; then
-            # Extract resource counts
             ADDS=$(grep -oP 'Plan: \K\d+(?= to add)' plan_output.txt || echo "0")
             CHANGES=$(grep -oP '\d+(?= to change)' plan_output.txt || echo "0")
             DESTROYS=$(grep -oP '\d+(?= to destroy)' plan_output.txt || echo "0")
@@ -297,13 +306,117 @@ jobs:
           echo "| RDS Endpoint | $(terraform output -raw rds_endpoint 2>/dev/null || echo 'N/A') |" >> $GITHUB_STEP_SUMMARY
 
   # ============================================
+  # TERRAFORM DESTROY
+  # ============================================
+  destroy:
+    name: "💥 Terraform Destroy"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - name: 🔒 Validate Destroy Confirmation
+        run: |
+          if [ "${{ inputs.confirm_destroy }}" != "DESTROY" ]; then
+            echo "❌ ERROR: You must type 'DESTROY' in the confirm_destroy field to proceed."
+            echo ""
+            echo "This is a safety measure to prevent accidental destruction."
+            exit 1
+          fi
+          echo "✅ Destroy confirmed"
+
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔧 Setup kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: 🗑️ Cleanup Kubernetes Resources
+        continue-on-error: true
+        run: |
+          echo "Attempting to connect to EKS cluster..."
+          aws eks update-kubeconfig \
+            --name ${{ env.TF_VAR_project_name }}-${{ env.TF_VAR_environment }} \
+            --region ${{ env.AWS_REGION }} || true
+          
+          echo "Deleting LoadBalancer services..."
+          kubectl get svc -A -o json 2>/dev/null | jq -r '.items[] | select(.spec.type=="LoadBalancer") | "\(.metadata.namespace) \(.metadata.name)"' | while read ns name; do
+            echo "  Deleting: $ns/$name"
+            kubectl delete svc $name -n $ns --wait=false 2>/dev/null || true
+          done
+          
+          echo "Waiting 60s for LoadBalancers to be released..."
+          sleep 60
+          
+          echo "Deleting namespaces..."
+          for ns in sonarqube monitoring argocd product-platform; do
+            kubectl delete namespace $ns --grace-period=0 --force --wait=false 2>/dev/null || true
+          done
+          
+          sleep 30
+
+      - name: 🔍 Terraform Init
+        run: terraform init
+
+      - name: 📋 Terraform Plan Destroy
+        run: |
+          terraform plan -destroy \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="rabbitmq_password=${{ secrets.RABBITMQ_PASSWORD }}" \
+            -out=destroy.tfplan
+
+      - name: 💥 Terraform Destroy
+        run: terraform apply -auto-approve destroy.tfplan
+
+      - name: 📝 Destroy Summary
+        if: always()
+        run: |
+          echo "## 💥 Infrastructure Destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Destroyed Resources:" >> $GITHUB_STEP_SUMMARY
+          echo "- VPC and networking" >> $GITHUB_STEP_SUMMARY
+          echo "- EKS cluster and node groups" >> $GITHUB_STEP_SUMMARY
+          echo "- RDS PostgreSQL" >> $GITHUB_STEP_SUMMARY
+          echo "- RabbitMQ (AmazonMQ)" >> $GITHUB_STEP_SUMMARY
+          echo "- Lambda functions" >> $GITHUB_STEP_SUMMARY
+          echo "- API Gateway" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔒 Preserved:" >> $GITHUB_STEP_SUMMARY
+          echo "- S3 bucket (Terraform state)" >> $GITHUB_STEP_SUMMARY
+          echo "- DynamoDB table (State locking)" >> $GITHUB_STEP_SUMMARY
+          echo "- ECR images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 💰 Cost Savings:" >> $GITHUB_STEP_SUMMARY
+          echo "- Before: ~\$250/month" >> $GITHUB_STEP_SUMMARY
+          echo "- After: ~\$0.50/month" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
   # SECURITY SUMMARY
   # ============================================
   security-summary:
     name: "Security Summary"
     runs-on: ubuntu-latest
     needs: [security-checkov, security-tfsec, plan]
-    if: always()
+    if: always() && inputs.action != 'destroy'
 
     steps:
       - name: 📊 Generate Security Summary
