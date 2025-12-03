@@ -92,10 +92,13 @@ resource "aws_mq_broker" "rabbitmq" {
   
   deployment_mode = "SINGLE_INSTANCE"
   
-  # === MUDANÇA PRINCIPAL ===
+  # Subnet pública se publicly_accessible = true
   subnet_ids          = [var.subnet_ids[0]]
-  security_groups     = [aws_security_group.amazonmq.id]
-  publicly_accessible = var.publicly_accessible  # Variável para controlar
+  
+  # CORREÇÃO: Security groups SÓ quando NÃO é público
+  security_groups     = var.publicly_accessible ? [] : [aws_security_group.amazonmq.id]
+  
+  publicly_accessible = var.publicly_accessible
 
   user {
     username = var.broker_username
