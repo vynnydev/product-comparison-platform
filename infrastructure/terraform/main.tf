@@ -56,15 +56,19 @@ module "amazonmq" {
 
   project_name = var.project_name
   environment  = var.environment
+  vpc_id       = module.vpc.vpc_id
+  vpc_cidr     = var.vpc_cidr
   
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnet_ids
-
-  broker_instance_type = "mq.t3.micro"
-  broker_username      = var.rabbitmq_username
-  broker_password      = var.rabbitmq_password
-
+  # IMPORTANTE: Usar subnet PÚBLICA para acesso externo
+  subnet_ids = module.vpc.public_subnet_ids  # <-- Mudar para public!
+  
   allowed_security_group_ids = [module.eks.node_security_group_id]
+  
+  broker_username     = "admin"
+  broker_password     = var.rabbitmq_password
+  
+  # Habilitar acesso público
+  publicly_accessible = true  # <-- Garantir que está true
 }
 
 # ============================================

@@ -52,5 +52,5 @@ variable "broker_password" {
 variable "publicly_accessible" {
   description = "Whether the broker should be publicly accessible (for dev only!)"
   type        = bool
-  default     = false
+  default     = true
 }
