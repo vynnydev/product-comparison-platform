@@ -337,19 +337,6 @@ output "lambda_ai_function_name" {
 }
 
 # ============================================
-# ALB CONTROLLER OUTPUTS
-# ============================================
-output "alb_controller_role_arn" {
-  description = "IAM Role ARN for AWS Load Balancer Controller"
-  value       = module.alb_controller.iam_role_arn
-}
-
-output "alb_controller_status" {
-  description = "Helm release status for AWS Load Balancer Controller"
-  value       = module.alb_controller.helm_release_status
-}
-
-# ============================================
 # ROUTE 53 OUTPUTS
 # ============================================
 output "route53_zone_id" {

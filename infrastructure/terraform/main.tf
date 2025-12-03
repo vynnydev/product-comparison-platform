@@ -185,23 +185,6 @@ module "api_gateway_ai" {
 }
 
 # ============================================
-# AWS LOAD BALANCER CONTROLLER
-# Enables ALB/NLB Ingress for Kubernetes
-# ============================================
-module "alb_controller" {
-  source = "./modules/alb-controller"
-
-  project_name         = var.project_name
-  environment          = var.environment
-  cluster_name         = module.eks.cluster_name
-  vpc_id               = module.vpc.vpc_id
-  create_oidc_provider = false  # EKS module já cria o OIDC provider
-  oidc_provider_arn    = module.eks.oidc_provider_arn
-
-  depends_on = [module.eks]
-}
-
-# ============================================
 # ROUTE 53 - DNS
 # ============================================
 module "route53" {
