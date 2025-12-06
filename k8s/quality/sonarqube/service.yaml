@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarqube
+  namespace: quality
+  labels:
+    app: sonarqube
+    app.kubernetes.io/name: sonarqube
+    app.kubernetes.io/part-of: quality-stack
+spec:
+  type: ClusterIP
+  selector:
+    app: sonarqube
+  ports:
+    - name: http
+      port: 9000
+      targetPort: 9000
+      protocol: TCP

@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+# Instala ArgoCD oficial
+resources:
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v2.9.3/manifests/install.yaml
+
+# Patches para customização
+patches:
+  # Habilitar insecure (sem TLS interno)
+  - patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --insecure
+    target:
+      kind: Deployment
+      name: argocd-server

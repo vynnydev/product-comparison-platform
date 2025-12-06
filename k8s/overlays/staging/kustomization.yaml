@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: product-platform
+
+resources:
+  - ../../apps
+
+configMapGenerator:
+  - name: env-config
+    literals:
+      - ENVIRONMENT=prod
+      - LOG_LEVEL=WARN
+      - SPRING_PROFILES_ACTIVE=prod,cloud
+
+patches:
+  - path: patches/replicas.yaml
+  - path: patches/resources.yaml
+
+commonLabels:
+  environment: prod
+
+commonAnnotations:
+  config.kubernetes.io/environment: prod
+
+images:
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-product-service
+    newName: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-prod-product-service
+    newTag: prod
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-ai-service
+    newName: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-prod-ai-service
+    newTag: prod
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-search-service
+    newName: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-prod-search-service
+    newTag: prod
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-frontend
+    newName: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-prod-frontend
+    newTag: prod

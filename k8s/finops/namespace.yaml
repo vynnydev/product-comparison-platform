@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: finops
+  labels:
+    app.kubernetes.io/name: finops
+    app.kubernetes.io/part-of: product-comparison
+    purpose: cost-management
+    istio-injection: disabled

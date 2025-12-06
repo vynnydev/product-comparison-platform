@@ -111,7 +111,6 @@ $RECYCLE.BIN/
 *.sqlite3
 *.trace.db
 *.h2.db
-data/
 *.mv.db
 
 # ============================================
@@ -125,7 +124,7 @@ data/
 *.crt
 *.p12
 *.jks
-secrets/
+# secrets/
 credentials/
 
 # ============================================
@@ -211,6 +210,7 @@ gradle-app.setting
 *.kubeconfig
 *-secret.yaml
 *-secrets.yaml
+*-credentials.yaml
 
 # ============================================
 # Misc

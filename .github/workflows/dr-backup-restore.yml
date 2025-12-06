@@ -1,0 +1,178 @@
+# ============================================
+# DISASTER RECOVERY - BACKUP & RESTORE
+# Manual backup and restore operations
+# ============================================
+
+name: 💾 DR Backup & Restore
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Operation to perform'
+        required: true
+        type: choice
+        options:
+          - create-backup
+          - list-backups
+          - restore-backup
+      resource:
+        description: 'Resource to backup/restore'
+        required: true
+        type: choice
+        options:
+          - rds
+          - elasticache
+          - all
+      backup_id:
+        description: 'Backup ID (for restore only)'
+        required: false
+        type: string
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        default: 'dev'
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  backup-restore:
+    name: 💾 ${{ github.event.inputs.operation }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📋 Set Variables
+        id: vars
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "rds_id=product-comparison-${{ github.event.inputs.environment }}-db" >> $GITHUB_OUTPUT
+          echo "redis_id=product-comparison-${{ github.event.inputs.environment }}-redis" >> $GITHUB_OUTPUT
+
+      # ========================================
+      # CREATE BACKUP
+      # ========================================
+      - name: 💾 Create RDS Snapshot
+        if: github.event.inputs.operation == 'create-backup' && (github.event.inputs.resource == 'rds' || github.event.inputs.resource == 'all')
+        run: |
+          SNAPSHOT_ID="manual-${{ steps.vars.outputs.rds_id }}-${{ steps.vars.outputs.timestamp }}"
+          
+          echo "Creating RDS snapshot: $SNAPSHOT_ID"
+          
+          aws rds create-db-snapshot \
+            --db-instance-identifier ${{ steps.vars.outputs.rds_id }} \
+            --db-snapshot-identifier $SNAPSHOT_ID \
+            --tags Key=Environment,Value=${{ github.event.inputs.environment }} \
+                   Key=CreatedBy,Value=github-actions \
+                   Key=Type,Value=manual-dr
+          
+          echo "✅ RDS snapshot created: $SNAPSHOT_ID"
+          echo "rds_snapshot_id=$SNAPSHOT_ID" >> $GITHUB_ENV
+
+      - name: 💾 Create ElastiCache Snapshot
+        if: github.event.inputs.operation == 'create-backup' && (github.event.inputs.resource == 'elasticache' || github.event.inputs.resource == 'all')
+        run: |
+          SNAPSHOT_ID="manual-${{ steps.vars.outputs.redis_id }}-${{ steps.vars.outputs.timestamp }}"
+          
+          echo "Creating ElastiCache snapshot: $SNAPSHOT_ID"
+          
+          aws elasticache create-snapshot \
+            --cache-cluster-id ${{ steps.vars.outputs.redis_id }} \
+            --snapshot-name $SNAPSHOT_ID
+          
+          echo "✅ ElastiCache snapshot created: $SNAPSHOT_ID"
+          echo "redis_snapshot_id=$SNAPSHOT_ID" >> $GITHUB_ENV
+
+      # ========================================
+      # LIST BACKUPS
+      # ========================================
+      - name: 📋 List RDS Snapshots
+        if: github.event.inputs.operation == 'list-backups' && (github.event.inputs.resource == 'rds' || github.event.inputs.resource == 'all')
+        run: |
+          echo "📋 RDS Snapshots for ${{ steps.vars.outputs.rds_id }}:"
+          echo ""
+          
+          aws rds describe-db-snapshots \
+            --db-instance-identifier ${{ steps.vars.outputs.rds_id }} \
+            --query 'DBSnapshots[*].[DBSnapshotIdentifier,SnapshotCreateTime,Status]' \
+            --output table
+
+      - name: 📋 List ElastiCache Snapshots
+        if: github.event.inputs.operation == 'list-backups' && (github.event.inputs.resource == 'elasticache' || github.event.inputs.resource == 'all')
+        run: |
+          echo "📋 ElastiCache Snapshots:"
+          echo ""
+          
+          aws elasticache describe-snapshots \
+            --cache-cluster-id ${{ steps.vars.outputs.redis_id }} \
+            --query 'Snapshots[*].[SnapshotName,SnapshotStatus,NodeSnapshots[0].SnapshotCreateTime]' \
+            --output table 2>/dev/null || echo "No snapshots found"
+
+      # ========================================
+      # RESTORE BACKUP
+      # ========================================
+      - name: 🔄 Restore RDS from Snapshot
+        if: github.event.inputs.operation == 'restore-backup' && github.event.inputs.resource == 'rds'
+        run: |
+          if [ -z "${{ github.event.inputs.backup_id }}" ]; then
+            echo "❌ Backup ID is required for restore operation"
+            exit 1
+          fi
+          
+          NEW_INSTANCE_ID="${{ steps.vars.outputs.rds_id }}-restored-${{ steps.vars.outputs.timestamp }}"
+          
+          echo "🔄 Restoring RDS from snapshot: ${{ github.event.inputs.backup_id }}"
+          echo "New instance ID: $NEW_INSTANCE_ID"
+          
+          aws rds restore-db-instance-from-db-snapshot \
+            --db-instance-identifier $NEW_INSTANCE_ID \
+            --db-snapshot-identifier ${{ github.event.inputs.backup_id }} \
+            --db-instance-class db.t3.micro \
+            --tags Key=Environment,Value=${{ github.event.inputs.environment }} \
+                   Key=RestoredFrom,Value=${{ github.event.inputs.backup_id }}
+          
+          echo "✅ Restore initiated. New instance: $NEW_INSTANCE_ID"
+          echo "⏳ Instance will be available in ~10-15 minutes"
+
+      - name: 📢 Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "💾 DR Backup/Restore - ${{ github.event.inputs.operation }}",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": "*Operation:*\n${{ github.event.inputs.operation }}"},
+                    {"type": "mrkdwn", "text": "*Resource:*\n${{ github.event.inputs.resource }}"},
+                    {"type": "mrkdwn", "text": "*Environment:*\n${{ github.event.inputs.environment }}"},
+                    {"type": "mrkdwn", "text": "*Status:*\n${{ job.status }}"}
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

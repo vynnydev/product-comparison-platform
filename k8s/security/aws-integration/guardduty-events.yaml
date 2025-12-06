@@ -1,0 +1,353 @@
+# ============================================
+# GUARDDUTY EVENTS PROCESSOR
+# Processa eventos do GuardDuty via EventBridge
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: guardduty-events-config
+  namespace: security
+  labels:
+    app: guardduty-events
+    app.kubernetes.io/name: guardduty-events
+    app.kubernetes.io/part-of: aws-integration
+data:
+  config.yaml: |
+    # GuardDuty Events Configuration
+    
+    # Severity mapping
+    severity_levels:
+      LOW: 1-3.9
+      MEDIUM: 4-6.9
+      HIGH: 7-8.9
+      CRITICAL: 9-10
+    
+    # Finding types to monitor
+    finding_types:
+      # Cryptocurrency
+      - "CryptoCurrency:EC2/BitcoinTool.B"
+      - "CryptoCurrency:EC2/BitcoinTool.B!DNS"
+      
+      # Unauthorized Access
+      - "UnauthorizedAccess:EC2/SSHBruteForce"
+      - "UnauthorizedAccess:EC2/RDPBruteForce"
+      - "UnauthorizedAccess:IAMUser/ConsoleLoginSuccess.B"
+      - "UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration"
+      
+      # Recon
+      - "Recon:EC2/PortProbeUnprotectedPort"
+      - "Recon:EC2/Portscan"
+      
+      # Trojan
+      - "Trojan:EC2/BlackholeTraffic"
+      - "Trojan:EC2/DropPoint"
+      
+      # Backdoor
+      - "Backdoor:EC2/DenialOfService.Tcp"
+      - "Backdoor:EC2/DenialOfService.Udp"
+      
+      # Impact
+      - "Impact:EC2/WinRMBruteForce"
+      - "Impact:EC2/PortSweep"
+    
+    # Actions per severity
+    actions:
+      LOW:
+        - log
+        - slack_notification
+      MEDIUM:
+        - log
+        - slack_notification
+        - discord_notification
+      HIGH:
+        - log
+        - slack_notification
+        - discord_notification
+        # - pagerduty_alert
+      CRITICAL:
+        - log
+        - slack_notification
+        - discord_notification
+        # - pagerduty_alert
+        - auto_remediate
+    
+    # Auto-remediation rules
+    remediation:
+      - finding_type: "UnauthorizedAccess:EC2/SSHBruteForce"
+        action: "block_ip"
+        waf_rule: "block-malicious-ips"
+      - finding_type: "Recon:EC2/PortProbeUnprotectedPort"
+        action: "update_security_group"
+        close_port: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guardduty-events-processor
+  namespace: security
+  labels:
+    app: guardduty-events
+    app.kubernetes.io/name: guardduty-events
+    app.kubernetes.io/part-of: aws-integration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guardduty-events
+  template:
+    metadata:
+      labels:
+        app: guardduty-events
+    spec:
+      serviceAccountName: guardduty-events-sa
+      
+      containers:
+        - name: processor
+          image: amazon/aws-cli:2.13.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Install dependencies
+              apk add --no-cache python3 py3-pip jq curl
+              pip3 install boto3 requests
+              
+              # Run the event processor
+              python3 /app/processor.py
+          
+          env:
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: slack-webhook
+                  key: SLACK_WEBHOOK_URL
+            - name: DISCORD_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: discord-webhook
+                  key: DISCORD_WEBHOOK_URL
+            # - name: PAGERDUTY_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: pagerduty-config
+            #       key: PAGERDUTY_SERVICE_KEY
+          
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+            - name: processor-script
+              mountPath: /app/processor.py
+              subPath: processor.py
+          
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "100m"
+              memory: "256Mi"
+      
+      volumes:
+        - name: config
+          configMap:
+            name: guardduty-events-config
+        - name: processor-script
+          configMap:
+            name: guardduty-processor-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: guardduty-processor-script
+  namespace: security
+  labels:
+    app: guardduty-events
+data:
+  processor.py: |
+    #!/usr/bin/env python3
+    """
+    GuardDuty Events Processor
+    Polls GuardDuty findings and sends notifications
+    """
+    import os
+    import json
+    import time
+    import boto3
+    import requests
+    from datetime import datetime, timedelta
+    
+    # Configuration
+    AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+    SLACK_WEBHOOK = os.environ.get('SLACK_WEBHOOK_URL')
+    DISCORD_WEBHOOK = os.environ.get('DISCORD_WEBHOOK_URL')
+    # PAGERDUTY_KEY = os.environ.get('PAGERDUTY_KEY')
+    POLL_INTERVAL = 60  # seconds
+    
+    # Initialize AWS client
+    guardduty = boto3.client('guardduty', region_name=AWS_REGION)
+    
+    def get_detector_id():
+        """Get the GuardDuty detector ID"""
+        response = guardduty.list_detectors()
+        if response['DetectorIds']:
+            return response['DetectorIds'][0]
+        return None
+    
+    def get_findings(detector_id, hours=1):
+        """Get GuardDuty findings from the last N hours"""
+        finding_criteria = {
+            'Criterion': {
+                'updatedAt': {
+                    'GreaterThanOrEqual': int((datetime.now() - timedelta(hours=hours)).timestamp() * 1000)
+                }
+            }
+        }
+        
+        response = guardduty.list_findings(
+            DetectorId=detector_id,
+            FindingCriteria=finding_criteria,
+            MaxResults=50
+        )
+        
+        if response['FindingIds']:
+            findings_response = guardduty.get_findings(
+                DetectorId=detector_id,
+                FindingIds=response['FindingIds']
+            )
+            return findings_response['Findings']
+        return []
+    
+    def send_slack_notification(finding):
+        """Send notification to Slack"""
+        if not SLACK_WEBHOOK:
+            return
+        
+        severity = finding['Severity']
+        color = '#FF0000' if severity >= 7 else '#FFA500' if severity >= 4 else '#FFFF00'
+        
+        payload = {
+            'attachments': [{
+                'color': color,
+                'title': f"🔍 GuardDuty Finding: {finding['Type']}",
+                'fields': [
+                    {'title': 'Severity', 'value': str(severity), 'short': True},
+                    {'title': 'Region', 'value': finding['Region'], 'short': True},
+                    {'title': 'Account', 'value': finding['AccountId'], 'short': True},
+                    {'title': 'Resource', 'value': finding.get('Resource', {}).get('ResourceType', 'N/A'), 'short': True},
+                    {'title': 'Description', 'value': finding['Description'], 'short': False}
+                ],
+                'footer': 'GuardDuty Events Processor',
+                'ts': int(time.time())
+            }]
+        }
+        
+        try:
+            requests.post(SLACK_WEBHOOK, json=payload)
+        except Exception as e:
+            print(f"Error sending Slack notification: {e}")
+    
+    def send_discord_notification(finding):
+        """Send notification to Discord"""
+        if not DISCORD_WEBHOOK:
+            return
+        
+        severity = finding['Severity']
+        color = 0xFF0000 if severity >= 7 else 0xFFA500 if severity >= 4 else 0xFFFF00
+        
+        payload = {
+            'embeds': [{
+                'title': f"🔍 GuardDuty Finding: {finding['Type']}",
+                'color': color,
+                'fields': [
+                    {'name': 'Severity', 'value': str(severity), 'inline': True},
+                    {'name': 'Region', 'value': finding['Region'], 'inline': True},
+                    {'name': 'Account', 'value': finding['AccountId'], 'inline': True},
+                    {'name': 'Description', 'value': finding['Description'][:1024], 'inline': False}
+                ],
+                'footer': {'text': 'GuardDuty Events Processor'},
+                'timestamp': datetime.utcnow().isoformat()
+            }]
+        }
+        
+        try:
+            requests.post(DISCORD_WEBHOOK, json=payload)
+        except Exception as e:
+            print(f"Error sending Discord notification: {e}")
+    
+    # def send_pagerduty_alert(finding):
+    #     """Send alert to PagerDuty for critical findings"""
+    #     if not PAGERDUTY_KEY or finding['Severity'] < 7:
+    #         return
+        
+    #     payload = {
+    #         'routing_key': PAGERDUTY_KEY,
+    #         'event_action': 'trigger',
+    #         'payload': {
+    #             'summary': f"GuardDuty: {finding['Type']}",
+    #             'severity': 'critical' if finding['Severity'] >= 8 else 'error',
+    #             'source': 'guardduty-events-processor',
+    #             'custom_details': {
+    #                 'finding_type': finding['Type'],
+    #                 'severity': finding['Severity'],
+    #                 'region': finding['Region'],
+    #                 'description': finding['Description']
+    #             }
+    #         }
+    #     }
+        
+    #     try:
+    #         requests.post('https://events.pagerduty.com/v2/enqueue', json=payload)
+    #     except Exception as e:
+    #         print(f"Error sending PagerDuty alert: {e}")
+    
+    def main():
+        """Main loop"""
+        print("Starting GuardDuty Events Processor...")
+        
+        detector_id = get_detector_id()
+        if not detector_id:
+            print("No GuardDuty detector found!")
+            return
+        
+        print(f"Using detector: {detector_id}")
+        processed_findings = set()
+        
+        while True:
+            try:
+                findings = get_findings(detector_id)
+                
+                for finding in findings:
+                    finding_id = finding['Id']
+                    
+                    if finding_id not in processed_findings:
+                        print(f"New finding: {finding['Type']} (Severity: {finding['Severity']})")
+                        
+                        send_slack_notification(finding)
+                        send_discord_notification(finding)
+                        # send_pagerduty_alert(finding)
+                        
+                        processed_findings.add(finding_id)
+                
+                # Cleanup old findings from set
+                if len(processed_findings) > 1000:
+                    processed_findings.clear()
+                
+            except Exception as e:
+                print(f"Error processing findings: {e}")
+            
+            time.sleep(POLL_INTERVAL)
+    
+    if __name__ == '__main__':
+        main()
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: guardduty-events-sa
+  namespace: security
+  annotations:
+    # IRSA para acessar GuardDuty
+    eks.amazonaws.com/role-arn: arn:aws:iam::347277718217:role/product-comparison-dev-guardduty-events-role

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: product-service-sa
+  namespace: product-platform
+  labels:
+    app: product-service
+    app.kubernetes.io/part-of: product-comparison
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::347277718217:role/product-comparison-dev-eks-node-role

@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-prometheus-rules
+  namespace: security
+  labels:
+    app: alerting
+data:
+  security-rules.yml: |
+    groups:
+      - name: security-alerts
+        rules:
+          # WAF Alerts
+          - alert: HighWAFBlockedRequests
+            expr: sum(rate(aws_wafv2_blocked_requests_total[5m])) > 100
+            for: 5m
+            labels:
+              severity: warning
+              category: security
+              source: waf
+            annotations:
+              summary: "High number of WAF blocked requests"
+              description: "WAF is blocking more than 100 requests per minute"
+              runbook_url: "https://wiki.cognitiva.solutions/runbooks/waf-high-blocks"
+          
+          - alert: WAFRuleTriggered
+            expr: increase(aws_wafv2_blocked_requests_total{rule=~"SQLi|XSS|RFI"}[5m]) > 10
+            for: 2m
+            labels:
+              severity: critical
+              category: security
+              source: waf
+            annotations:
+              summary: "WAF attack pattern detected"
+              description: "Potential {{ $labels.rule }} attack detected"
+          
+          # GuardDuty Alerts
+          - alert: GuardDutyFinding
+            expr: aws_guardduty_finding_count > 0
+            for: 1m
+            labels:
+              severity: critical
+              category: security
+              source: guardduty
+            annotations:
+              summary: "GuardDuty security finding detected"
+              description: "AWS GuardDuty has detected a potential security threat"
+          
+          # Pod Security
+          - alert: PodSecurityViolation
+            expr: count(kube_pod_status_phase{phase="Failed", namespace="product-platform"}) > 0
+            for: 5m
+            labels:
+              severity: warning
+              category: security
+            annotations:
+              summary: "Pod security violation detected"
+              description: "Pods are failing, possible security policy violation"
+
+      - name: infrastructure-alerts
+        rules:
+          - alert: HighCPUUsage
+            expr: avg(rate(container_cpu_usage_seconds_total{namespace="product-platform"}[5m])) by (pod) > 0.8
+            for: 10m
+            labels:
+              severity: warning
+              category: infrastructure
+            annotations:
+              summary: "High CPU usage on {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} is using more than 80% CPU"
+          
+          - alert: HighMemoryUsage
+            expr: avg(container_memory_usage_bytes{namespace="product-platform"} / container_spec_memory_limit_bytes{namespace="product-platform"}) by (pod) > 0.85
+            for: 10m
+            labels:
+              severity: warning
+              category: infrastructure
+            annotations:
+              summary: "High memory usage on {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} is using more than 85% memory"
+          
+          - alert: PodCrashLooping
+            expr: increase(kube_pod_container_status_restarts_total{namespace="product-platform"}[1h]) > 5
+            for: 5m
+            labels:
+              severity: critical
+              category: infrastructure
+            annotations:
+              summary: "Pod {{ $labels.pod }} is crash looping"
+              description: "Container {{ $labels.container }} in pod {{ $labels.pod }} has restarted more than 5 times in the last hour"
+
+      - name: disaster-recovery-alerts
+        rules:
+          - alert: DatabaseConnectionFailure
+            expr: pg_up{job="postgresql"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              category: disaster-recovery
+              component: database
+            annotations:
+              summary: "PostgreSQL database is down"
+              description: "Unable to connect to PostgreSQL database"
+              runbook_url: "https://wiki.cognitiva.solutions/runbooks/db-failure"
+          
+          - alert: RabbitMQDown
+            expr: rabbitmq_up == 0
+            for: 2m
+            labels:
+              severity: critical
+              category: disaster-recovery
+              component: messaging
+            annotations:
+              summary: "RabbitMQ is down"
+              description: "Unable to connect to RabbitMQ message broker"
+              runbook_url: "https://wiki.cognitiva.solutions/runbooks/rabbitmq-failure"
+          
+          - alert: AllPodsDown
+            expr: sum(kube_deployment_status_replicas_available{namespace="product-platform"}) == 0
+            for: 2m
+            labels:
+              severity: critical
+              category: disaster-recovery
+              component: application
+            annotations:
+              summary: "All application pods are down"
+              description: "No pods are available in product-platform namespace"
+              runbook_url: "https://wiki.cognitiva.solutions/runbooks/complete-outage"
+          
+          - alert: EKSNodeNotReady
+            expr: kube_node_status_condition{condition="Ready", status="true"} == 0
+            for: 5m
+            labels:
+              severity: critical
+              category: disaster-recovery
+              component: kubernetes
+            annotations:
+              summary: "EKS node {{ $labels.node }} is not ready"
+              description: "Kubernetes node has been not ready for 5 minutes"
+              runbook_url: "https://wiki.cognitiva.solutions/runbooks/node-failure"
+          
+          - alert: HighErrorRate
+            expr: sum(rate(http_server_requests_seconds_count{namespace="product-platform", status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count{namespace="product-platform"}[5m])) > 0.1
+            for: 5m
+            labels:
+              severity: critical
+              category: disaster-recovery
+              component: application
+            annotations:
+              summary: "High error rate detected"
+              description: "More than 10% of requests are failing"
+              runbook_url: "https://wiki.cognitiva.solutions/runbooks/high-error-rate"

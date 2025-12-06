@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quality
+  labels:
+    app.kubernetes.io/name: quality
+    app.kubernetes.io/part-of: product-comparison
+    purpose: code-quality

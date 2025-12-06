@@ -1,34 +1,17 @@
-# ============================================
-# KUSTOMIZATION - Product Comparison Platform
-# ============================================
-# Deploy tudo com: kubectl apply -k k8s/
-# ============================================
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: product-platform
-
-# Recursos a serem aplicados em ordem
+# Todos os recursos do projeto
 resources:
-  # 1. Infrastructure (namespace, quotas)
-  - infrastructure/namespace.yaml
-  - infrastructure/configmaps.yaml
-  - infrastructure/secrets.yaml
-  
-  # 2. Microservices
-  - product-service/deployment.yaml
-  - ai-service/deployment.yaml
-  
-  # 3. Ingress/LoadBalancer
-  - ingress/ingress.yaml
+  - base/
+  - apps/
+  - monitoring/
+  - quality/
+  - data/
+  - argocd/
+  - ingress/
+  - security/
 
-# Labels comuns para todos os recursos
 commonLabels:
   app.kubernetes.io/part-of: product-comparison
   app.kubernetes.io/managed-by: kustomize
-  environment: dev
-
-# Annotations comuns
-commonAnnotations:
-  owner: "vini"
-  project: "product-comparison-platform"

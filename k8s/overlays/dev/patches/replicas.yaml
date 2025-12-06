@@ -1,0 +1,28 @@
+# Reduce replicas for dev environment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  spec:
+    replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  spec:
+    replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-service
+  spec:
+    replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  spec:
+    replicas: 1

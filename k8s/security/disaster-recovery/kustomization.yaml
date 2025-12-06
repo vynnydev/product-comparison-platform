@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: security
+
+resources:
+  - controller-deployment.yaml
+  - configmap.yaml
+
+commonLabels:
+  app.kubernetes.io/name: disaster-recovery
+  app.kubernetes.io/part-of: security-stack

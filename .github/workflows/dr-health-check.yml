@@ -1,0 +1,218 @@
+# ============================================
+# DISASTER RECOVERY - HEALTH CHECK
+# Runs periodically to verify infrastructure
+# ============================================
+
+name: 🏥 DR Health Check
+
+on:
+  schedule:
+    # Every 6 hours
+    - cron: '0 */6 * * *'
+  
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to check'
+        required: true
+        type: choice
+        default: 'dev'
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  health-check:
+    name: 🔍 Infrastructure Health Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.environment)) || fromJSON('["dev"]') }}
+    
+    steps:
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔧 Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: ☸️ Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --name product-comparison-${{ matrix.environment }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: 📊 Check EKS Cluster
+        id: eks
+        run: |
+          STATUS=$(aws eks describe-cluster \
+            --name product-comparison-${{ matrix.environment }} \
+            --query 'cluster.status' --output text 2>/dev/null || echo "NOT_FOUND")
+          
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          
+          if [ "$STATUS" != "ACTIVE" ]; then
+            echo "❌ EKS cluster is not active: $STATUS"
+            echo "eks_healthy=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ EKS cluster is active"
+            echo "eks_healthy=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📊 Check Nodes
+        id: nodes
+        run: |
+          READY_NODES=$(kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready " || echo "0")
+          TOTAL_NODES=$(kubectl get nodes --no-headers 2>/dev/null | wc -l || echo "0")
+          
+          echo "ready_nodes=$READY_NODES" >> $GITHUB_OUTPUT
+          echo "total_nodes=$TOTAL_NODES" >> $GITHUB_OUTPUT
+          
+          if [ "$READY_NODES" -lt 1 ]; then
+            echo "❌ No ready nodes found"
+            echo "nodes_healthy=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Nodes ready: $READY_NODES/$TOTAL_NODES"
+            echo "nodes_healthy=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📊 Check Pods
+        id: pods
+        run: |
+          RUNNING_PODS=$(kubectl get pods -n product-platform --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+          TOTAL_PODS=$(kubectl get pods -n product-platform --no-headers 2>/dev/null | wc -l || echo "0")
+          
+          echo "running_pods=$RUNNING_PODS" >> $GITHUB_OUTPUT
+          echo "total_pods=$TOTAL_PODS" >> $GITHUB_OUTPUT
+          
+          # Check for crashed pods
+          CRASHED=$(kubectl get pods -n product-platform --no-headers 2>/dev/null | grep -c "CrashLoopBackOff\|Error" || echo "0")
+          echo "crashed_pods=$CRASHED" >> $GITHUB_OUTPUT
+          
+          if [ "$CRASHED" -gt 0 ]; then
+            echo "⚠️ Found $CRASHED crashed pods"
+            echo "pods_healthy=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Pods running: $RUNNING_PODS/$TOTAL_PODS"
+            echo "pods_healthy=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📊 Check RDS
+        id: rds
+        run: |
+          STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier product-comparison-${{ matrix.environment }}-db \
+            --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          
+          if [ "$STATUS" != "available" ]; then
+            echo "❌ RDS is not available: $STATUS"
+            echo "rds_healthy=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ RDS is available"
+            echo "rds_healthy=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📊 Check ElastiCache
+        id: redis
+        run: |
+          STATUS=$(aws elasticache describe-cache-clusters \
+            --cache-cluster-id product-comparison-${{ matrix.environment }}-redis \
+            --query 'CacheClusters[0].CacheClusterStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+          
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          
+          if [ "$STATUS" != "available" ]; then
+            echo "⚠️ Redis is not available: $STATUS"
+            echo "redis_healthy=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Redis is available"
+            echo "redis_healthy=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📊 Check OpenSearch
+        id: opensearch
+        run: |
+          STATUS=$(aws opensearch describe-domain \
+            --domain-name prod-comp-${{ matrix.environment }}-search \
+            --query 'DomainStatus.Processing' --output text 2>/dev/null || echo "NOT_FOUND")
+          
+          if [ "$STATUS" == "false" ]; then
+            echo "✅ OpenSearch is ready"
+            echo "opensearch_healthy=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ OpenSearch status: $STATUS"
+            echo "opensearch_healthy=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📊 Generate Report
+        id: report
+        run: |
+          # Determine overall health
+          if [ "${{ steps.eks.outputs.eks_healthy }}" == "true" ] && \
+             [ "${{ steps.nodes.outputs.nodes_healthy }}" == "true" ] && \
+             [ "${{ steps.pods.outputs.pods_healthy }}" == "true" ] && \
+             [ "${{ steps.rds.outputs.rds_healthy }}" == "true" ]; then
+            echo "overall_status=healthy" >> $GITHUB_OUTPUT
+            echo "status_emoji=✅" >> $GITHUB_OUTPUT
+          else
+            echo "overall_status=degraded" >> $GITHUB_OUTPUT
+            echo "status_emoji=⚠️" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📢 Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ steps.report.outputs.status_emoji }} DR Health Check - ${{ matrix.environment }}",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": "*EKS Cluster:*\n${{ steps.eks.outputs.eks_healthy == 'true' && '✅ Active' || '❌ Issue' }}"},
+                    {"type": "mrkdwn", "text": "*Nodes:*\n${{ steps.nodes.outputs.nodes_healthy == 'true' && '✅' || '❌' }} ${{ steps.nodes.outputs.ready_nodes }}/${{ steps.nodes.outputs.total_nodes }}"},
+                    {"type": "mrkdwn", "text": "*Pods:*\n${{ steps.pods.outputs.pods_healthy == 'true' && '✅' || '⚠️' }} ${{ steps.pods.outputs.running_pods }}/${{ steps.pods.outputs.total_pods }}"},
+                    {"type": "mrkdwn", "text": "*RDS:*\n${{ steps.rds.outputs.rds_healthy == 'true' && '✅ Available' || '❌ Issue' }}"},
+                    {"type": "mrkdwn", "text": "*Redis:*\n${{ steps.redis.outputs.redis_healthy == 'true' && '✅ Available' || '⚠️ Issue' }}"},
+                    {"type": "mrkdwn", "text": "*OpenSearch:*\n${{ steps.opensearch.outputs.opensearch_healthy == 'true' && '✅ Ready' || '⚠️ Issue' }}"}
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: ❌ Fail if unhealthy
+        if: steps.report.outputs.overall_status == 'degraded'
+        run: |
+          echo "⚠️ Infrastructure health check detected issues"
+          # Don't fail - just alert
+          # exit 1

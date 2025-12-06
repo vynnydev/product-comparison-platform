@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-config
+  namespace: product-platform
+  labels:
+    app.kubernetes.io/part-of: product-comparison
+    environment: staging
+data:
+  # Environment
+  ENVIRONMENT: "staging"
+  
+  # Logging
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  
+  # Spring
+  SPRING_PROFILES_ACTIVE: "staging,cloud"
+  
+  # Features
+  ENABLE_SWAGGER: "true"
+  ENABLE_DEBUG_ENDPOINTS: "false"
+  ENABLE_METRICS: "true"
+  
+  # Cache
+  CACHE_TTL_SECONDS: "300"
+  
+  # Rate Limiting
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "100"
+  
+  # Tracing
+  TRACING_ENABLED: "true"
+  TRACING_SAMPLE_RATE: "0.5"

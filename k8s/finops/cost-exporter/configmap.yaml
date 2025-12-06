@@ -1,0 +1,333 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cost-exporter-config
+  namespace: finops
+  labels:
+    app: cost-exporter
+    app.kubernetes.io/name: cost-exporter
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: finops
+data:
+  # Configuração do exporter
+  config.yaml: |
+    # AWS Cost Exporter Configuration
+    aws:
+      region: us-east-1
+      
+    # Métricas a coletar
+    metrics:
+      # Custo por serviço
+      - name: aws_cost_by_service
+        description: "AWS cost by service"
+        granularity: DAILY
+        group_by:
+          - type: DIMENSION
+            key: SERVICE
+        filter:
+          tags:
+            Project: product-comparison
+            
+      # Custo por tipo de uso
+      - name: aws_cost_by_usage_type
+        description: "AWS cost by usage type"
+        granularity: DAILY
+        group_by:
+          - type: DIMENSION
+            key: USAGE_TYPE
+        filter:
+          tags:
+            Project: product-comparison
+            
+      # Custo por região
+      - name: aws_cost_by_region
+        description: "AWS cost by region"
+        granularity: DAILY
+        group_by:
+          - type: DIMENSION
+            key: REGION
+        filter:
+          tags:
+            Project: product-comparison
+    
+    # Configuração do servidor
+    server:
+      port: 9090
+      metrics_path: /metrics
+      
+    # Intervalo de coleta (em segundos)
+    scrape_interval: 3600  # 1 hora
+    
+    # Período de lookback (em dias)
+    lookback_days: 30
+    
+    # Tags para filtrar custos
+    cost_allocation_tags:
+      - Project
+      - Environment
+      - CostCenter
+      - Owner
+
+  # Script Python do exporter
+  exporter.py: |
+    #!/usr/bin/env python3
+    """
+    AWS Cost Explorer Prometheus Exporter
+    Exports AWS cost metrics to Prometheus format
+    """
+    
+    import os
+    import time
+    import boto3
+    import yaml
+    from datetime import datetime, timedelta
+    from prometheus_client import start_http_server, Gauge, Info
+    from prometheus_client.core import CollectorRegistry
+    import logging
+    
+    # Configuração de logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger(__name__)
+    
+    # Registry customizado
+    registry = CollectorRegistry()
+    
+    # Métricas Prometheus
+    DAILY_COST = Gauge(
+        'aws_daily_cost_dollars',
+        'Daily AWS cost in dollars',
+        ['project', 'service', 'environment'],
+        registry=registry
+    )
+    
+    MONTHLY_COST = Gauge(
+        'aws_monthly_cost_dollars',
+        'Monthly AWS cost in dollars (MTD)',
+        ['project'],
+        registry=registry
+    )
+    
+    MONTHLY_FORECAST = Gauge(
+        'aws_monthly_forecast_dollars',
+        'Monthly AWS cost forecast in dollars',
+        ['project'],
+        registry=registry
+    )
+    
+    BUDGET_USAGE = Gauge(
+        'aws_budget_usage_percent',
+        'Budget usage percentage',
+        ['project', 'budget_name'],
+        registry=registry
+    )
+    
+    COST_BY_SERVICE = Gauge(
+        'aws_cost_by_service_dollars',
+        'AWS cost by service in dollars',
+        ['project', 'service'],
+        registry=registry
+    )
+    
+    EXPORTER_INFO = Info(
+        'aws_cost_exporter',
+        'AWS Cost Exporter information',
+        registry=registry
+    )
+    
+    class AWSCostExporter:
+        def __init__(self):
+            self.ce_client = boto3.client('ce', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+            self.budgets_client = boto3.client('budgets', region_name='us-east-1')
+            self.project_name = os.environ.get('PROJECT_NAME', 'product-comparison')
+            self.environment = os.environ.get('ENVIRONMENT', 'dev')
+            self.account_id = boto3.client('sts').get_caller_identity()['Account']
+            
+            # Set exporter info
+            EXPORTER_INFO.info({
+                'version': '1.0.0',
+                'project': self.project_name,
+                'environment': self.environment
+            })
+            
+            logger.info(f"Initialized exporter for project: {self.project_name}")
+        
+        def get_date_range(self, days=30):
+            """Get date range for cost queries"""
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+            return start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
+        
+        def get_month_range(self):
+            """Get current month date range"""
+            now = datetime.now()
+            start_date = now.replace(day=1)
+            end_date = now
+            return start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
+        
+        def collect_daily_costs(self):
+            """Collect daily costs by service"""
+            try:
+                start_date, end_date = self.get_date_range(days=7)
+                
+                response = self.ce_client.get_cost_and_usage(
+                    TimePeriod={
+                        'Start': start_date,
+                        'End': end_date
+                    },
+                    Granularity='DAILY',
+                    Metrics=['UnblendedCost'],
+                    GroupBy=[
+                        {'Type': 'DIMENSION', 'Key': 'SERVICE'}
+                    ],
+                    Filter={
+                        'Tags': {
+                            'Key': 'Project',
+                            'Values': [self.project_name]
+                        }
+                    }
+                )
+                
+                for result in response['ResultsByTime']:
+                    for group in result['Groups']:
+                        service = group['Keys'][0]
+                        cost = float(group['Metrics']['UnblendedCost']['Amount'])
+                        
+                        DAILY_COST.labels(
+                            project=self.project_name,
+                            service=service,
+                            environment=self.environment
+                        ).set(cost)
+                        
+                        COST_BY_SERVICE.labels(
+                            project=self.project_name,
+                            service=service
+                        ).set(cost)
+                
+                logger.info("Daily costs collected successfully")
+                
+            except Exception as e:
+                logger.error(f"Error collecting daily costs: {e}")
+        
+        def collect_monthly_cost(self):
+            """Collect monthly total cost (MTD)"""
+            try:
+                start_date, end_date = self.get_month_range()
+                
+                response = self.ce_client.get_cost_and_usage(
+                    TimePeriod={
+                        'Start': start_date,
+                        'End': end_date
+                    },
+                    Granularity='MONTHLY',
+                    Metrics=['UnblendedCost'],
+                    Filter={
+                        'Tags': {
+                            'Key': 'Project',
+                            'Values': [self.project_name]
+                        }
+                    }
+                )
+                
+                total_cost = 0
+                for result in response['ResultsByTime']:
+                    total_cost = float(result['Total']['UnblendedCost']['Amount'])
+                
+                MONTHLY_COST.labels(project=self.project_name).set(total_cost)
+                logger.info(f"Monthly cost (MTD): ${total_cost:.2f}")
+                
+            except Exception as e:
+                logger.error(f"Error collecting monthly cost: {e}")
+        
+        def collect_forecast(self):
+            """Collect monthly cost forecast"""
+            try:
+                now = datetime.now()
+                start_date = now.strftime('%Y-%m-%d')
+                
+                # End of month
+                next_month = now.replace(day=28) + timedelta(days=4)
+                end_date = (next_month - timedelta(days=next_month.day)).strftime('%Y-%m-%d')
+                
+                response = self.ce_client.get_cost_forecast(
+                    TimePeriod={
+                        'Start': start_date,
+                        'End': end_date
+                    },
+                    Metric='UNBLENDED_COST',
+                    Granularity='MONTHLY',
+                    Filter={
+                        'Tags': {
+                            'Key': 'Project',
+                            'Values': [self.project_name]
+                        }
+                    }
+                )
+                
+                forecast = float(response['Total']['Amount'])
+                MONTHLY_FORECAST.labels(project=self.project_name).set(forecast)
+                logger.info(f"Monthly forecast: ${forecast:.2f}")
+                
+            except Exception as e:
+                logger.error(f"Error collecting forecast: {e}")
+        
+        def collect_budget_usage(self):
+            """Collect budget usage"""
+            try:
+                response = self.budgets_client.describe_budgets(
+                    AccountId=self.account_id
+                )
+                
+                for budget in response.get('Budgets', []):
+                    budget_name = budget['BudgetName']
+                    
+                    if self.project_name in budget_name:
+                        limit = float(budget['BudgetLimit']['Amount'])
+                        
+                        actual = float(budget.get('CalculatedSpend', {}).get('ActualSpend', {}).get('Amount', 0))
+                        
+                        if limit > 0:
+                            usage_percent = (actual / limit) * 100
+                            BUDGET_USAGE.labels(
+                                project=self.project_name,
+                                budget_name=budget_name
+                            ).set(usage_percent)
+                            
+                            logger.info(f"Budget {budget_name}: {usage_percent:.1f}%")
+                
+            except Exception as e:
+                logger.error(f"Error collecting budget usage: {e}")
+        
+        def collect_all(self):
+            """Collect all metrics"""
+            logger.info("Starting metrics collection...")
+            self.collect_daily_costs()
+            self.collect_monthly_cost()
+            self.collect_forecast()
+            self.collect_budget_usage()
+            logger.info("Metrics collection completed")
+    
+    def main():
+        port = int(os.environ.get('METRICS_PORT', 9090))
+        interval = int(os.environ.get('SCRAPE_INTERVAL', 3600))
+        
+        logger.info(f"Starting AWS Cost Exporter on port {port}")
+        
+        # Start HTTP server
+        start_http_server(port, registry=registry)
+        
+        # Initialize exporter
+        exporter = AWSCostExporter()
+        
+        # Initial collection
+        exporter.collect_all()
+        
+        # Collection loop
+        while True:
+            time.sleep(interval)
+            exporter.collect_all()
+    
+    if __name__ == '__main__':
+        main()

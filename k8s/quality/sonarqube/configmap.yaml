@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sonarqube-config
+  namespace: quality
+  labels:
+    app: sonarqube
+    app.kubernetes.io/name: sonarqube
+    app.kubernetes.io/part-of: quality-stack
+data:
+  # JVM Options
+  SONAR_WEB_JAVAOPTS: "-Xmx512m -Xms128m"
+  SONAR_CE_JAVAOPTS: "-Xmx512m -Xms128m"
+  SONAR_SEARCH_JAVAOPTS: "-Xmx512m -Xms512m"
+  
+  # SonarQube settings
+  SONAR_WEB_PORT: "9000"
+  SONAR_WEB_CONTEXT: "/"
+  
+  # Elasticsearch settings
+  SONAR_SEARCH_JAVAADDITIONALOPTS: "-Dnode.store.allow_mmap=false"

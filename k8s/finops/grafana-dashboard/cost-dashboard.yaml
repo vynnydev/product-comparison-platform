@@ -1,0 +1,349 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finops-dashboard
+  namespace: monitoring
+  labels:
+    app: grafana
+    grafana_dashboard: "true"
+data:
+  finops-dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 200},
+                  {"color": "red", "value": 300}
+                ]
+              },
+              "unit": "currencyUSD"
+            }
+          },
+          "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "dimensions": {
+                "Project": "product-comparison"
+              },
+              "expression": "",
+              "id": "",
+              "matchExact": true,
+              "metricEditorMode": 0,
+              "metricName": "MonthlyTotalCost",
+              "metricQueryType": 0,
+              "namespace": "FinOps/Costs",
+              "period": "",
+              "queryMode": "Metrics",
+              "refId": "A",
+              "region": "default",
+              "statistic": "Maximum"
+            }
+          ],
+          "title": "💰 Monthly Cost (MTD)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 250},
+                  {"color": "red", "value": 350}
+                ]
+              },
+              "unit": "currencyUSD"
+            }
+          },
+          "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
+          "id": 2,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "dimensions": {
+                "Project": "product-comparison"
+              },
+              "metricName": "MonthlyForecast",
+              "namespace": "FinOps/Costs",
+              "refId": "A",
+              "region": "default",
+              "statistic": "Maximum"
+            }
+          ],
+          "title": "📈 Monthly Forecast",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "percentage",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 80},
+                  {"color": "red", "value": 100}
+                ]
+              },
+              "max": 300,
+              "min": 0,
+              "unit": "currencyUSD"
+            }
+          },
+          "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0},
+          "id": 3,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [
+            {
+              "dimensions": {
+                "Project": "product-comparison"
+              },
+              "metricName": "MonthlyTotalCost",
+              "namespace": "FinOps/Costs",
+              "refId": "A",
+              "region": "default",
+              "statistic": "Maximum"
+            }
+          ],
+          "title": "🎯 Budget Usage",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {"type": "linear"},
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {"group": "A", "mode": "normal"},
+                "thresholdsStyle": {"mode": "off"}
+              },
+              "mappings": [],
+              "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+              "unit": "currencyUSD"
+            }
+          },
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 6},
+          "id": 4,
+          "options": {
+            "legend": {
+              "calcs": ["sum"],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {"mode": "multi", "sort": "desc"}
+          },
+          "targets": [
+            {
+              "dimensions": {
+                "Project": "product-comparison",
+                "Service": "*"
+              },
+              "metricName": "DailyCost",
+              "namespace": "FinOps/Costs",
+              "refId": "A",
+              "region": "default",
+              "statistic": "Sum"
+            }
+          ],
+          "title": "📊 Daily Cost by Service",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"hideFrom": {"legend": false, "tooltip": false, "viz": false}},
+              "mappings": [],
+              "unit": "currencyUSD"
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "id": 5,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "values": ["value", "percent"]
+            },
+            "pieType": "pie",
+            "reduceOptions": {
+              "calcs": ["sum"],
+              "fields": "",
+              "values": false
+            },
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "targets": [
+            {
+              "dimensions": {
+                "Project": "product-comparison",
+                "Service": "*"
+              },
+              "metricName": "DailyCost",
+              "namespace": "FinOps/Costs",
+              "refId": "A",
+              "region": "default",
+              "statistic": "Sum"
+            }
+          ],
+          "title": "🥧 Cost Distribution by Service",
+          "type": "piechart"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {
+                "align": "auto",
+                "displayMode": "auto",
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+              "unit": "currencyUSD"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+          "id": 6,
+          "options": {
+            "footer": {
+              "fields": "",
+              "reducer": ["sum"],
+              "show": true
+            },
+            "showHeader": true,
+            "sortBy": [{"desc": true, "displayName": "Cost"}]
+          },
+          "targets": [
+            {
+              "dimensions": {
+                "Project": "product-comparison",
+                "Service": "*"
+              },
+              "metricName": "DailyCost",
+              "namespace": "FinOps/Costs",
+              "refId": "A",
+              "region": "default",
+              "statistic": "Sum"
+            }
+          ],
+          "title": "📋 Cost by Service (Table)",
+          "transformations": [
+            {
+              "id": "groupBy",
+              "options": {
+                "fields": {
+                  "Service": {"aggregations": [], "operation": "groupby"},
+                  "Value": {"aggregations": ["sum"], "operation": "aggregate"}
+                }
+              }
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "refresh": "1h",
+      "schemaVersion": 38,
+      "tags": ["finops", "costs", "budget"],
+      "templating": {"list": []},
+      "time": {"from": "now-30d", "to": "now"},
+      "timepicker": {},
+      "timezone": "",
+      "title": "💰 FinOps - Cost Dashboard",
+      "uid": "finops-costs",
+      "version": 1
+    }

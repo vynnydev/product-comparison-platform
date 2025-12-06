@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cost-exporter
+  namespace: finops
+  labels:
+    app: cost-exporter
+    app.kubernetes.io/name: cost-exporter
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: finops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cost-exporter
+  template:
+    metadata:
+      labels:
+        app: cost-exporter
+        app.kubernetes.io/name: cost-exporter
+        app.kubernetes.io/component: metrics
+        app.kubernetes.io/part-of: finops
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: cost-exporter-sa
+      
+      containers:
+        - name: cost-exporter
+          image: python:3.11-slim
+          
+          command:
+            - /bin/bash
+            - -c
+            - |
+              pip install --quiet boto3 prometheus_client pyyaml &&
+              python /app/exporter.py
+          
+          ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          
+          env:
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: PROJECT_NAME
+              value: "product-comparison"
+            - name: ENVIRONMENT
+              value: "dev"
+            - name: METRICS_PORT
+              value: "9090"
+            - name: SCRAPE_INTERVAL
+              value: "3600"  # 1 hora
+            # Secrets (se não usar IRSA)
+            # - name: AWS_ACCESS_KEY_ID
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: cost-exporter-secret
+            #       key: AWS_ACCESS_KEY_ID
+            # - name: AWS_SECRET_ACCESS_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: cost-exporter-secret
+            #       key: AWS_SECRET_ACCESS_KEY
+          
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          volumeMounts:
+            - name: config
+              mountPath: /app/exporter.py
+              subPath: exporter.py
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+      
+      volumes:
+        - name: config
+          configMap:
+            name: cost-exporter-config
+            defaultMode: 0755
+      
+      # Node selector (opcional)
+      # nodeSelector:
+      #   role: monitoring
+      
+      # Tolerations (opcional)
+      # tolerations:
+      #   - key: "dedicated"
+      #     operator: "Equal"
+      #     value: "monitoring"
+      #     effect: "NoSchedule"
+
+---
+# Service Account com IRSA
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cost-exporter-sa
+  namespace: finops
+  labels:
+    app: cost-exporter
+    app.kubernetes.io/name: cost-exporter
+    app.kubernetes.io/part-of: finops
+  annotations:
+    # IRSA - Role ARN para acesso ao Cost Explorer
+    eks.amazonaws.com/role-arn: arn:aws:iam::347277718217:role/product-comparison-dev-cost-exporter-role

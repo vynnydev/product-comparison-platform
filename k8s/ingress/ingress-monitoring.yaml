@@ -1,0 +1,50 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-ingress
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: monitoring-ingress
+    app.kubernetes.io/part-of: monitoring-stack
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:347277718217:certificate/72c4303a-8a1c-450f-b101-90d3d7acfad3
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+    
+    # Group
+    alb.ingress.kubernetes.io/group.name: product-comparison
+    alb.ingress.kubernetes.io/group.order: "10"
+    
+    # Autenticação básica (opcional)
+    # alb.ingress.kubernetes.io/auth-type: cognito
+spec:
+  ingressClassName: alb
+  rules:
+    # Grafana
+    - host: grafana.cognitiva.solutions
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+    
+    # Prometheus (cuidado: expor publicamente)
+    - host: prometheus.cognitiva.solutions
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  spec:
+    template:
+      spec:
+        containers:
+          - name: product-service
+            resources:
+              requests:
+                cpu: "200m"
+                memory: "384Mi"
+              limits:
+                cpu: "750m"
+                memory: "768Mi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  spec:
+    template:
+      spec:
+        containers:
+          - name: ai-service
+            resources:
+              requests:
+                cpu: "200m"
+                memory: "384Mi"
+              limits:
+                cpu: "750m"
+                memory: "1Gi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-service
+  spec:
+    template:
+      spec:
+        containers:
+          - name: search-service
+            resources:
+              requests:
+                cpu: "200m"
+                memory: "384Mi"
+              limits:
+                cpu: "500m"
+                memory: "768Mi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  spec:
+    template:
+      spec:
+        containers:
+          - name: frontend
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "256Mi"
+              limits:
+                cpu: "200m"
+                memory: "512Mi"

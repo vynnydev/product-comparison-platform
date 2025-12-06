@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quality-ingress
+  namespace: quality
+  labels:
+    app.kubernetes.io/name: quality-ingress
+    app.kubernetes.io/part-of: quality-stack
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:347277718217:certificate/72c4303a-8a1c-450f-b101-90d3d7acfad3
+    alb.ingress.kubernetes.io/healthcheck-path: /api/system/status
+    alb.ingress.kubernetes.io/group.name: product-comparison
+    alb.ingress.kubernetes.io/group.order: "20"
+spec:
+  ingressClassName: alb
+  rules:
+    - host: sonar.cognitiva.solutions
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sonarqube
+                port:
+                  number: 9000

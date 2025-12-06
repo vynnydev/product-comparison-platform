@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-config
+  namespace: product-platform
+  labels:
+    app.kubernetes.io/part-of: product-comparison
+data:
+  # ============================================
+  # DATABASE - RDS PostgreSQL
+  # ============================================
+  DB_HOST: "product-comparison-dev-postgresql.c0j6s6gus7cz.us-east-1.rds.amazonaws.com"
+  DB_PORT: "5432"
+  DB_NAME: "productdb"
+  DB_SSL_MODE: "require"
+  
+  # ============================================
+  # RABBITMQ - Amazon MQ
+  # ============================================
+  RABBITMQ_HOST: "b-c9d83fd2-98e9-4740-b3b4-1bd04611e3a3.mq.us-east-1.on.aws"
+  RABBITMQ_PORT: "5671"
+  RABBITMQ_SSL_ENABLED: "true"
+  RABBITMQ_VHOST: "/"
+  
+  # ============================================
+  # REDIS - ElastiCache
+  # ============================================
+  REDIS_HOST: "product-comparison-dev-redis.4k6mni.ng.0001.use1.cache.amazonaws.com"
+  REDIS_PORT: "6379"
+  REDIS_SSL_ENABLED: "false"
+  
+  # ============================================
+  # OPENSEARCH
+  # ============================================
+  OPENSEARCH_HOST: "vpc-prod-comp-dev-search-lf4ult6kxxzmexenf4la7omhe4.us-east-1.es.amazonaws.com"
+  OPENSEARCH_PORT: "443"
+  OPENSEARCH_SCHEME: "https"
+  
+  # ============================================
+  # AWS
+  # ============================================
+  AWS_REGION: "us-east-1"
+  AWS_ACCOUNT_ID: "347277718217"
+  
+  # ============================================
+  # AI SERVICE
+  # ============================================
+  AI_API_URL: "https://pncx5lds5i.execute-api.us-east-1.amazonaws.com/prod/ai"
+  
+  # ============================================
+  # FRONTEND
+  # ============================================
+  FRONTEND_URL: "https://d2r9vjnwtewxe0.cloudfront.net"
+  CLOUDFRONT_DISTRIBUTION_ID: "E1G50GCXAK3YC3"

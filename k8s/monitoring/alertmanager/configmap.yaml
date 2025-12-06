@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+  labels:
+    app: alertmanager
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'alertmanager@cognitiva.solutions'
+      smtp_require_tls: true
+
+    route:
+      group_by: ['alertname', 'namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'default-receiver'
+      routes:
+        - match:
+            severity: critical
+          receiver: 'critical-receiver'
+        - match:
+            severity: warning
+          receiver: 'warning-receiver'
+
+    receivers:
+      - name: 'default-receiver'
+        # webhook_configs:
+        #   - url: 'http://slack-webhook-url'
+      
+      - name: 'critical-receiver'
+        # webhook_configs:
+        #   - url: 'http://pagerduty-webhook-url'
+      
+      - name: 'warning-receiver'
+        # webhook_configs:
+        #   - url: 'http://slack-webhook-url'
+
+    inhibit_rules:
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'namespace']

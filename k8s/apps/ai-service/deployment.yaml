@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  namespace: product-platform
+  labels:
+    app: ai-service
+    app.kubernetes.io/name: ai-service
+    app.kubernetes.io/part-of: product-comparison
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-service
+  template:
+    metadata:
+      labels:
+        app: ai-service
+    spec:
+      serviceAccountName: ai-service-sa
+      containers:
+        - name: ai-service
+          image: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-ai-service:latest
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: shared-config
+            - secretRef:
+                name: rabbitmq-credentials
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "dev,cloud"
+            - name: SERVER_PORT
+              value: "8081"
+            - name: BEDROCK_MODEL_ID
+              value: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 5

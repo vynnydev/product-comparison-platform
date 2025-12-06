@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: product-platform
+
+resources:
+  - configmap.yaml
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+
+commonLabels:
+  app.kubernetes.io/name: ai-service
+  app.kubernetes.io/part-of: product-comparison
+  app.kubernetes.io/managed-by: kustomize

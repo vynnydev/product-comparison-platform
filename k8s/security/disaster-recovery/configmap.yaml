@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: disaster-recovery-config
+  namespace: security
+  labels:
+    app: disaster-recovery-controller
+data:
+  config.yaml: |
+    # Disaster Recovery Configuration
+    
+    # Components to monitor
+    components:
+      - name: database
+        type: rds
+        health_check:
+          type: tcp
+          host: product-comparison-dev-db.xxxxx.us-east-1.rds.amazonaws.com
+          port: 5432
+          interval: 30s
+          timeout: 10s
+        recovery:
+          terraform_module: rds
+          auto_recover: true
+          max_attempts: 3
+      
+      - name: rabbitmq
+        type: amazonmq
+        health_check:
+          type: tcp
+          host: b-xxxxx.mq.us-east-1.amazonaws.com
+          port: 5671
+          interval: 30s
+          timeout: 10s
+        recovery:
+          terraform_module: rabbitmq
+          auto_recover: true
+          max_attempts: 3
+      
+      - name: redis
+        type: elasticache
+        health_check:
+          type: tcp
+          host: product-comparison-dev-redis.xxxxx.cache.amazonaws.com
+          port: 6379
+          interval: 30s
+          timeout: 10s
+        recovery:
+          terraform_module: elasticache
+          auto_recover: true
+          max_attempts: 3
+      
+      - name: opensearch
+        type: opensearch
+        health_check:
+          type: https
+          host: vpc-prod-comp-dev-search-xxxxx.us-east-1.es.amazonaws.com
+          port: 443
+          path: /_cluster/health
+          interval: 60s
+          timeout: 15s
+        recovery:
+          terraform_module: opensearch
+          auto_recover: true
+          max_attempts: 2
+      
+      - name: eks
+        type: eks
+        health_check:
+          type: kubernetes
+          namespace: product-platform
+          min_ready_pods: 2
+          interval: 30s
+        recovery:
+          terraform_module: eks
+          auto_recover: false
+          requires_approval: true
+    
+    # Notification settings
+    notifications:
+      slack:
+        enabled: true
+        channels:
+          - "#alerts-disaster-recovery"
+          - "#devops-team"
+      pagerduty:
+        enabled: true
+        escalation_policy: "infrastructure-critical"
+      email:
+        enabled: false
+        recipients:
+          - "devops@cognitiva.solutions"
+    
+    # Recovery settings
+    recovery:
+      github_workflow: ".github/workflows/disaster-recovery.yml"
+      approval_timeout: 15m
+      cooldown_period: 10m

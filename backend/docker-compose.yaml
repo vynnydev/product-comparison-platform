@@ -1,4 +1,8 @@
 services:
+  # ============================================
+  # DATABASES
+  # ============================================
+  
   # PostgreSQL Database - ARM64 optimized
   postgres:
     image: postgres:15-alpine
@@ -23,7 +27,7 @@ services:
       retries: 10
     shm_size: 128mb
 
-  # Create databases - SINTAXE CORRETA POSTGRESQL
+  # Create databases
   postgres-init:
     image: postgres:15-alpine
     platform: linux/arm64
@@ -38,8 +42,13 @@ services:
     command: >
       sh -c "
       psql -h postgres -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname = 'productdb'\" | grep -q 1 || psql -h postgres -U postgres -c 'CREATE DATABASE productdb;' &&
-      psql -h postgres -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname = 'aidb'\" | grep -q 1 || psql -h postgres -U postgres -c 'CREATE DATABASE aidb;'
+      psql -h postgres -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname = 'aidb'\" | grep -q 1 || psql -h postgres -U postgres -c 'CREATE DATABASE aidb;' &&
+      psql -h postgres -U postgres -tc \"SELECT 1 FROM pg_database WHERE datname = 'searchdb'\" | grep -q 1 || psql -h postgres -U postgres -c 'CREATE DATABASE searchdb;'
       "
+
+  # ============================================
+  # MESSAGING
+  # ============================================
 
   # RabbitMQ - ARM64
   rabbitmq:
@@ -61,6 +70,61 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  # ============================================
+  # CACHE & SEARCH
+  # ============================================
+
+  # Redis - Cache
+  redis:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    tmpfs:
+      - /data:rw,noexec,nosuid,size=128m
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command: redis-server --appendonly no --maxmemory 100mb --maxmemory-policy allkeys-lru
+
+  # OpenSearch - Full-text Search
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    tmpfs:
+      - /usr/share/opensearch/data:rw,size=512m
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'green\\|yellow'"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  # ============================================
+  # MICROSERVICES
+  # ============================================
 
   # Product Service
   product-service:
@@ -109,6 +173,59 @@ services:
         condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
+    networks:
+      - microservices-network
+    restart: on-failure
+
+  # Search Service (NEW)
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+    container_name: search-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      REDIS_HOST: redis
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+      OPENSEARCH_SCHEME: http
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: on-failure
+
+  # Frontend
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+    container_name: frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://product-service:8080
+      NEXT_PUBLIC_SEARCH_API_URL: http://search-service:8082
+    ports:
+      - "3000:3000"
+    depends_on:
+      - product-service
+      - search-service
     networks:
       - microservices-network
     restart: on-failure

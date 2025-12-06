@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kube-system
+
+resources:
+  - serviceaccount.yaml
+  # O controller é instalado via Helm, apenas a ServiceAccount via Kustomize
+
+commonLabels:
+  app.kubernetes.io/name: aws-load-balancer-controller

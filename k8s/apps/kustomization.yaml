@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: product-platform
+
+resources:
+  - product-service/
+  - ai-service/
+  - search-service/
+  - frontend/
+
+commonLabels:
+  app.kubernetes.io/part-of: product-comparison
+  app.kubernetes.io/managed-by: kustomize
+  environment: dev

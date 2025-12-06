@@ -28,3 +28,8 @@ output "node_security_group_id" {
   description = "Security group dos nodes"
   value       = aws_security_group.node.id
 }
+
+output "oidc_issuer_url" {
+  description = "URL do OIDC issuer"
+  value       = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}

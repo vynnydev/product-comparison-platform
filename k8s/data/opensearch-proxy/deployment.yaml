@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opensearch-proxy
+  namespace: data
+  labels:
+    app: opensearch-proxy
+    app.kubernetes.io/name: opensearch-proxy
+    app.kubernetes.io/part-of: data-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opensearch-proxy
+  template:
+    metadata:
+      labels:
+        app: opensearch-proxy
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+          
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: opensearch-proxy-config

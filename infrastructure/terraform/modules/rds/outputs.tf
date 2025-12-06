@@ -64,3 +64,8 @@ output "all_databases" {
   description = "List of all database names"
   value       = concat([var.db_name], var.additional_databases)
 }
+
+output "db_instance_identifier" {
+  description = "RDS instance identifier"
+  value       = aws_db_instance.postgresql.identifier
+}

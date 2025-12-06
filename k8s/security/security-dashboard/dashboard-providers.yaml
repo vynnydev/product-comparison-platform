@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-dashboard-providers
+  namespace: security
+  labels:
+    app: security-dashboard
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'security'
+        orgId: 1
+        folder: 'Security'
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards

@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cost-exporter
+  namespace: finops
+  labels:
+    app: cost-exporter
+    app.kubernetes.io/name: cost-exporter
+    app.kubernetes.io/part-of: finops
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: cost-exporter
+  namespaceSelector:
+    matchNames:
+      - finops
+  endpoints:
+    - port: metrics
+      interval: 1h
+      scrapeTimeout: 30s
+      path: /metrics

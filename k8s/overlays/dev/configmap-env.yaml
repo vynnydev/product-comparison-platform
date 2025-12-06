@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: env-config
+  namespace: product-platform
+data:
+  ENVIRONMENT: "dev"
+  LOG_LEVEL: "DEBUG"
+  SPRING_PROFILES_ACTIVE: "dev,cloud"
+  ENABLE_SWAGGER: "true"
+  ENABLE_DEBUG_ENDPOINTS: "true"

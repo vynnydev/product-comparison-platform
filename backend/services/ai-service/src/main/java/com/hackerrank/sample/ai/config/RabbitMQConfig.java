@@ -1,9 +1,6 @@
 package com.hackerrank.sample.ai.config;
 
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -13,95 +10,125 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * RabbitMQ Configuration for AI-Service (Consumer)
+ * RabbitMQ Configuration for AI Service
  * 
- * CORREÇÃO: Usa properties que JÁ EXISTEM no application-docker.properties
+ * Consumes from:
+ * - products.exchange (product.created, product.updated)
  * 
- * Properties usadas:
- * - rabbitmq.exchange.products (estava "products", mudado para "name")
- * - rabbitmq.queue.product-events
- * - rabbitmq.routing-key.product-created
+ * Publishes to:
+ * - analysis.exchange (analysis.completed)
  */
 @Configuration
 public class RabbitMQConfig {
     
-    // ✅ CORRIGIDO: Usar "rabbitmq.exchange.name" (não "rabbitmq.exchange.products")
-    @Value("${rabbitmq.exchange.name:products.exchange}")
-    private String exchange;
+    // ============================================
+    // CONSUME: Product Events
+    // ============================================
     
-    @Value("${rabbitmq.queue.product-events:product.ai.analysis.queue}")
-    private String queueName;
+    @Value("${rabbitmq.exchange.products:products.exchange}")
+    private String productsExchange;
+    
+    @Value("${rabbitmq.queue.product-events:product.events}")
+    private String productEventsQueue;
     
     @Value("${rabbitmq.routing-key.product-created:product.created}")
-    private String routingKeyCreated;
+    private String routingKeyProductCreated;
     
-    @Value("${rabbitmq.routing-key.product-updated:product.updated}")
-    private String routingKeyUpdated;
+    // ============================================
+    // PUBLISH: Analysis Events
+    // ============================================
     
-    /**
-     * Declare the queue that will receive product events
-     */
-    @Bean
-    public Queue productEventsQueue() {
-        return new Queue(queueName, true); // durable = true
-    }
+    @Value("${rabbitmq.exchange.analysis:analysis.exchange}")
+    private String analysisExchange;
     
-    /**
-     * Declare the exchange (must match product-service)
-     */
+    @Value("${rabbitmq.routing-key.analysis-completed:analysis.completed}")
+    private String routingKeyAnalysisCompleted;
+    
+    // ============================================
+    // EXCHANGES
+    // ============================================
+    
     @Bean
     public TopicExchange productsExchange() {
-        return new TopicExchange(exchange);
+        return ExchangeBuilder
+                .topicExchange(productsExchange)
+                .durable(true)
+                .build();
     }
     
-    /**
-     * Bind queue to exchange with routing key for PRODUCT_CREATED
-     */
     @Bean
-    public Binding bindingProductCreated(Queue productEventsQueue, TopicExchange productsExchange) {
-        return BindingBuilder
-                .bind(productEventsQueue)
-                .to(productsExchange)
-                .with(routingKeyCreated);
+    public TopicExchange analysisExchange() {
+        return ExchangeBuilder
+                .topicExchange(analysisExchange)
+                .durable(true)
+                .build();
     }
     
-    /**
-     * Bind queue to exchange with routing key for PRODUCT_UPDATED
-     */
+    // ============================================
+    // QUEUES
+    // ============================================
+    
     @Bean
-    public Binding bindingProductUpdated(Queue productEventsQueue, TopicExchange productsExchange) {
-        return BindingBuilder
-                .bind(productEventsQueue)
-                .to(productsExchange)
-                .with(routingKeyUpdated);
+    public Queue productEventsQueue() {
+        return QueueBuilder
+                .durable(productEventsQueue)
+                .withArgument("x-dead-letter-exchange", "dlx.exchange")
+                .withArgument("x-dead-letter-routing-key", "dlq.ai.product")
+                .build();
     }
     
-    /**
-     * Optional: Bind to wildcard pattern (all product events)
-     */
+    // ============================================
+    // DEAD LETTER QUEUE
+    // ============================================
+    
     @Bean
-    public Binding bindingProductAll(Queue productEventsQueue, TopicExchange productsExchange) {
-        return BindingBuilder
-                .bind(productEventsQueue)
-                .to(productsExchange)
-                .with("product.#"); // Matches: product.created, product.updated, product.deleted
+    public TopicExchange deadLetterExchange() {
+        return ExchangeBuilder
+                .topicExchange("dlx.exchange")
+                .durable(true)
+                .build();
     }
     
-    /**
-     * JSON message converter
-     */
+    @Bean
+    public Queue deadLetterQueue() {
+        return QueueBuilder
+                .durable("dlq.ai.product")
+                .build();
+    }
+    
+    @Bean
+    public Binding dlqBinding() {
+        return BindingBuilder
+                .bind(deadLetterQueue())
+                .to(deadLetterExchange())
+                .with("dlq.ai.product");
+    }
+    
+    // ============================================
+    // BINDINGS
+    // ============================================
+    
+    @Bean
+    public Binding productEventsBinding() {
+        return BindingBuilder
+                .bind(productEventsQueue())
+                .to(productsExchange())
+                .with("product.*");
+    }
+    
+    // ============================================
+    // MESSAGE CONVERTER
+    // ============================================
+    
     @Bean
     public MessageConverter jsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
     }
     
-    /**
-     * RabbitTemplate with JSON converter
-     */
     @Bean
     public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
-        RabbitTemplate template = new RabbitTemplate(connectionFactory);
-        template.setMessageConverter(jsonMessageConverter());
-        return template;
+        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+        rabbitTemplate.setMessageConverter(jsonMessageConverter());
+        return rabbitTemplate;
     }
 }

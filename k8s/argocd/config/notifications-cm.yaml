@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-notifications-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Serviços de notificação
+  service.slack: |
+    token: $slack-token
+  
+  # Templates
+  template.app-deployed: |
+    message: |
+      ✅ Application {{.app.metadata.name}} is now running new version.
+      Revision: {{.app.status.sync.revision}}
+      Environment: {{.app.spec.destination.namespace}}
+  
+  template.app-health-degraded: |
+    message: |
+      ⚠️ Application {{.app.metadata.name}} has degraded.
+      Health Status: {{.app.status.health.status}}
+      Sync Status: {{.app.status.sync.status}}
+  
+  template.app-sync-failed: |
+    message: |
+      ❌ Application {{.app.metadata.name}} sync failed.
+      Sync Status: {{.app.status.sync.status}}
+      Error: {{.app.status.conditions}}
+  
+  # Triggers
+  trigger.on-deployed: |
+    - description: Application synced and healthy
+      send:
+        - app-deployed
+      when: app.status.operationState.phase in ['Succeeded'] and app.status.health.status == 'Healthy'
+  
+  trigger.on-health-degraded: |
+    - description: Application health degraded
+      send:
+        - app-health-degraded
+      when: app.status.health.status == 'Degraded'
+  
+  trigger.on-sync-failed: |
+    - description: Application sync failed
+      send:
+        - app-sync-failed
+      when: app.status.operationState.phase in ['Error', 'Failed']

@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: product-platform
+
+# Base resources
+resources:
+  - ../../apps
+
+# Environment-specific configs
+configMapGenerator:
+  - name: env-config
+    literals:
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=DEBUG
+      - SPRING_PROFILES_ACTIVE=dev,cloud
+
+# Patches
+patches:
+  - path: patches/replicas.yaml
+  - path: patches/resources.yaml
+
+# Labels
+commonLabels:
+  environment: dev
+
+# Annotations
+commonAnnotations:
+  config.kubernetes.io/environment: dev
+
+# Images - use dev tags
+images:
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-product-service
+    newTag: dev
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-ai-service
+    newTag: dev
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-search-service
+    newTag: dev
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-frontend
+    newTag: dev

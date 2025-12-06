@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-service-config
+  namespace: product-platform
+  labels:
+    app: product-service
+    app.kubernetes.io/name: product-service
+    app.kubernetes.io/part-of: product-comparison
+data:
+  SPRING_PROFILES_ACTIVE: "cloud"
+  SERVER_PORT: "8080"
+  
+  # Database
+  DB_NAME: "productdb"
+  DB_PORT: "5432"
+  
+  # RabbitMQ
+  RABBITMQ_PORT: "5671"
+  RABBITMQ_SSL_ENABLED: "true"
+  
+  # Queues
+  RABBITMQ_EXCHANGE_PRODUCTS: "products.exchange"
+  RABBITMQ_ROUTING_KEY_CREATED: "product.created"
+  RABBITMQ_ROUTING_KEY_UPDATED: "product.updated"
+  RABBITMQ_ROUTING_KEY_DELETED: "product.deleted"

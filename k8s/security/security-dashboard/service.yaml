@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: security-dashboard
+  namespace: security
+  labels:
+    app: security-dashboard
+spec:
+  type: ClusterIP
+  selector:
+    app: security-dashboard
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP

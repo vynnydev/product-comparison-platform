@@ -1,0 +1,190 @@
+# ============================================
+# AWS SHIELD METRICS EXPORTER
+# Monitora ataques DDoS via AWS Shield
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shield-exporter-config
+  namespace: security
+  labels:
+    app: shield-exporter
+    app.kubernetes.io/name: shield-exporter
+    app.kubernetes.io/part-of: aws-integration
+data:
+  config.yaml: |
+    # AWS Shield Metrics Configuration
+    
+    aws:
+      region: us-east-1
+    
+    # Recursos protegidos
+    protected_resources:
+      - type: cloudfront
+        id: "E1G50GCXAK3YC3"
+      - type: alb
+        id: "arn:aws:elasticloadbalancing:us-east-1:347277718217:loadbalancer/app/product-comparison-alb/xxxxx"
+    
+    # Métricas
+    metrics:
+      - DDoSDetected
+      - DDoSAttackBitsPerSecond
+      - DDoSAttackPacketsPerSecond
+      - DDoSAttackRequestsPerSecond
+    
+    scrape_interval: 60s
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shield-metrics-exporter
+  namespace: security
+  labels:
+    app: shield-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shield-exporter
+  template:
+    metadata:
+      labels:
+        app: shield-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: shield-exporter-sa
+      
+      containers:
+        - name: exporter
+          image: python:3.11-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install boto3 prometheus_client
+              python /app/exporter.py
+          
+          ports:
+            - name: metrics
+              containerPort: 9091
+              protocol: TCP
+          
+          env:
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: METRICS_PORT
+              value: "9091"
+          
+          volumeMounts:
+            - name: exporter-script
+              mountPath: /app/exporter.py
+              subPath: exporter.py
+          
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+      
+      volumes:
+        - name: exporter-script
+          configMap:
+            name: shield-exporter-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shield-exporter-script
+  namespace: security
+data:
+  exporter.py: |
+    #!/usr/bin/env python3
+    """AWS Shield Metrics Exporter"""
+    import os
+    import time
+    import boto3
+    from datetime import datetime, timedelta
+    from prometheus_client import start_http_server, Gauge
+    
+    AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+    METRICS_PORT = int(os.environ.get('METRICS_PORT', 9091))
+    
+    cloudwatch = boto3.client('cloudwatch', region_name=AWS_REGION)
+    
+    # Prometheus metrics
+    ddos_detected = Gauge('shield_ddos_detected', 'DDoS attacks detected')
+    ddos_bps = Gauge('shield_ddos_bits_per_second', 'DDoS attack bits per second')
+    ddos_pps = Gauge('shield_ddos_packets_per_second', 'DDoS attack packets per second')
+    ddos_rps = Gauge('shield_ddos_requests_per_second', 'DDoS attack requests per second')
+    
+    def get_shield_metrics():
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(minutes=5)
+        
+        metrics = [
+            ('DDoSDetected', ddos_detected),
+            ('DDoSAttackBitsPerSecond', ddos_bps),
+            ('DDoSAttackPacketsPerSecond', ddos_pps),
+            ('DDoSAttackRequestsPerSecond', ddos_rps),
+        ]
+        
+        for metric_name, gauge in metrics:
+            try:
+                response = cloudwatch.get_metric_statistics(
+                    Namespace='AWS/DDoSProtection',
+                    MetricName=metric_name,
+                    StartTime=start_time,
+                    EndTime=end_time,
+                    Period=300,
+                    Statistics=['Maximum']
+                )
+                
+                if response['Datapoints']:
+                    value = response['Datapoints'][-1]['Maximum']
+                    gauge.set(value)
+                else:
+                    gauge.set(0)
+                    
+            except Exception as e:
+                print(f"Error getting {metric_name}: {e}")
+                gauge.set(0)
+    
+    def main():
+        print(f"Starting Shield Metrics Exporter on port {METRICS_PORT}...")
+        start_http_server(METRICS_PORT)
+        
+        while True:
+            get_shield_metrics()
+            time.sleep(60)
+    
+    if __name__ == '__main__':
+        main()
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shield-exporter
+  namespace: security
+  labels:
+    app: shield-exporter
+spec:
+  type: ClusterIP
+  selector:
+    app: shield-exporter
+  ports:
+    - name: metrics
+      port: 9091
+      targetPort: 9091
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: shield-exporter-sa
+  namespace: security
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::347277718217:role/shield-exporter-role

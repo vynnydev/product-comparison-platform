@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: security-dashboard
+  namespace: security
+  labels:
+    app: security-dashboard
+    app.kubernetes.io/name: security-dashboard
+    app.kubernetes.io/part-of: security-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: security-dashboard
+  template:
+    metadata:
+      labels:
+        app: security-dashboard
+    spec:
+      serviceAccountName: security-dashboard-sa
+      
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.2.0
+          
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: security-dashboard-secrets
+                  key: GRAFANA_PASSWORD
+            - name: GF_INSTALL_PLUGINS
+              value: "grafana-clock-panel,grafana-piechart-panel,grafana-worldmap-panel"
+            - name: GF_AWS_PROFILES
+              value: "default"
+            - name: GF_AWS_default_REGION
+              value: "us-east-1"
+          
+          volumeMounts:
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-providers
+              mountPath: /etc/grafana/provisioning/dashboards
+          
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "300m"
+              memory: "512Mi"
+          
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      
+      volumes:
+        - name: dashboards
+          configMap:
+            name: security-dashboard-config
+        - name: datasources
+          configMap:
+            name: security-datasources
+        - name: dashboard-providers
+          configMap:
+            name: security-dashboard-providers
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: security-dashboard-sa
+  namespace: security
+  labels:
+    app: security-dashboard
+  annotations:
+    # IRSA para acessar CloudWatch
+    eks.amazonaws.com/role-arn: arn:aws:iam::347277718217:role/security-dashboard-role

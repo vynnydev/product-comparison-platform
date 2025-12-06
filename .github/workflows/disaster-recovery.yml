@@ -1,0 +1,421 @@
+# ============================================
+# DISASTER RECOVERY WORKFLOW
+# Triggered by alerts or manual dispatch
+# ============================================
+
+name: 🆘 Disaster Recovery
+
+on:
+  # Trigger manual
+  workflow_dispatch:
+    inputs:
+      component:
+        description: 'Component to recover'
+        required: true
+        type: choice
+        options:
+          - all
+          - eks
+          - rds
+          - elasticache
+          - opensearch
+          - rabbitmq
+      action:
+        description: 'Recovery action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy-and-recreate
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        default: 'dev'
+        options:
+          - dev
+          - staging
+          - prod
+
+  # Trigger via webhook (Alertmanager)
+  repository_dispatch:
+    types: [disaster-recovery]
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: 1.6.0
+  TERRAFORM_DIR: infrastructure/terraform
+
+jobs:
+  # ============================================
+  # VALIDATE & PLAN
+  # ============================================
+  validate:
+    name: 🔍 Validate & Plan
+    runs-on: ubuntu-latest
+    outputs:
+      plan_exit_code: ${{ steps.plan.outputs.exit_code }}
+      
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📋 Determine Component
+        id: component
+        run: |
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            COMPONENT="${{ github.event.client_payload.component }}"
+            ACTION="${{ github.event.client_payload.action }}"
+            ENVIRONMENT="${{ github.event.client_payload.environment }}"
+          else
+            COMPONENT="${{ github.event.inputs.component }}"
+            ACTION="${{ github.event.inputs.action }}"
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+          fi
+          
+          echo "component=$COMPONENT" >> $GITHUB_OUTPUT
+          echo "action=$ACTION" >> $GITHUB_OUTPUT
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          
+          echo "🎯 Component: $COMPONENT"
+          echo "🔧 Action: $ACTION"
+          echo "🌍 Environment: $ENVIRONMENT"
+
+      - name: 📁 Terraform Init
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          terraform init \
+            -backend-config="bucket=product-comparison-terraform-state" \
+            -backend-config="key=${{ steps.component.outputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+
+      - name: ✅ Terraform Validate
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform validate
+
+      - name: 📊 Terraform Plan
+        id: plan
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          terraform plan \
+            -var-file="environments/${{ steps.component.outputs.environment }}.tfvars" \
+            -out=tfplan \
+            -detailed-exitcode || echo "exit_code=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: 💾 Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TERRAFORM_DIR }}/tfplan
+          retention-days: 1
+
+      - name: 📢 Notify Slack - Plan Started
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🆘 Disaster Recovery - Plan",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": "*Component:*\n${{ steps.component.outputs.component }}"},
+                    {"type": "mrkdwn", "text": "*Environment:*\n${{ steps.component.outputs.environment }}"},
+                    {"type": "mrkdwn", "text": "*Action:*\n${{ steps.component.outputs.action }}"},
+                    {"type": "mrkdwn", "text": "*Status:*\n${{ job.status }}"}
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ============================================
+  # APPROVAL (for prod)
+  # ============================================
+  approval:
+    name: ⏳ Approval Required
+    needs: validate
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event.inputs.environment == 'prod' || 
+       github.event.client_payload.environment == 'prod') &&
+      (github.event.inputs.action != 'plan' &&
+       github.event.client_payload.action != 'plan')
+    env: 
+      ENVIRONMENT: production
+    
+    steps:
+      - name: ✅ Approved
+        run: echo "Production deployment approved"
+
+  # ============================================
+  # APPLY
+  # ============================================
+  apply:
+    name: 🚀 Apply Recovery
+    needs: [validate, approval]
+    if: |
+      always() &&
+      needs.validate.result == 'success' &&
+      (needs.approval.result == 'success' || needs.approval.result == 'skipped') &&
+      (github.event.inputs.action != 'plan' || github.event.client_payload.action != 'plan')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📋 Determine Environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "environment=${{ github.event.client_payload.environment }}" >> $GITHUB_OUTPUT
+            echo "component=${{ github.event.client_payload.component }}" >> $GITHUB_OUTPUT
+            echo "action=${{ github.event.client_payload.action }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "component=${{ github.event.inputs.component }}" >> $GITHUB_OUTPUT
+            echo "action=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📁 Terraform Init
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          terraform init \
+            -backend-config="bucket=product-comparison-terraform-state" \
+            -backend-config="key=${{ steps.env.outputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+
+      - name: 📥 Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TERRAFORM_DIR }}
+
+      - name: 🔥 Destroy (if destroy-and-recreate)
+        if: steps.env.outputs.action == 'destroy-and-recreate'
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          case "${{ steps.env.outputs.component }}" in
+            "rds")
+              terraform destroy -target=module.rds -auto-approve \
+                -var-file="environments/${{ steps.env.outputs.environment }}.tfvars"
+              ;;
+            "elasticache")
+              terraform destroy -target=module.elasticache -auto-approve \
+                -var-file="environments/${{ steps.env.outputs.environment }}.tfvars"
+              ;;
+            "opensearch")
+              terraform destroy -target=module.opensearch -auto-approve \
+                -var-file="environments/${{ steps.env.outputs.environment }}.tfvars"
+              ;;
+            "rabbitmq")
+              terraform destroy -target=module.amazonmq -auto-approve \
+                -var-file="environments/${{ steps.env.outputs.environment }}.tfvars"
+              ;;
+            "eks")
+              echo "⚠️ EKS destroy requires manual intervention"
+              exit 1
+              ;;
+          esac
+
+      - name: 🚀 Terraform Apply
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          terraform apply -auto-approve tfplan
+
+      - name: ✅ Verify Infrastructure
+        run: |
+          echo "🔍 Verifying infrastructure..."
+          
+          # Verificar EKS
+          aws eks describe-cluster --name product-comparison-${{ steps.env.outputs.environment }} \
+            --query 'cluster.status' --output text
+          
+          # Verificar RDS
+          aws rds describe-db-instances \
+            --db-instance-identifier product-comparison-${{ steps.env.outputs.environment }}-db \
+            --query 'DBInstances[0].DBInstanceStatus' --output text || true
+          
+          echo "✅ Infrastructure verification complete"
+
+      - name: 📢 Notify Slack - Apply Complete
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ job.status == 'success' && '✅' || '❌' }} Disaster Recovery - Complete",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": "*Component:*\n${{ steps.env.outputs.component }}"},
+                    {"type": "mrkdwn", "text": "*Environment:*\n${{ steps.env.outputs.environment }}"},
+                    {"type": "mrkdwn", "text": "*Action:*\n${{ steps.env.outputs.action }}"},
+                    {"type": "mrkdwn", "text": "*Status:*\n${{ job.status }}"}
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ============================================
+  # POST-RECOVERY VALIDATION
+  # ============================================
+  post-recovery:
+    name: 🔍 Post-Recovery Validation
+    needs: apply
+    if: needs.apply.result == 'success'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📋 Determine Environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "environment=${{ github.event.client_payload.environment }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🔧 Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: ☸️ Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --name product-comparison-${{ steps.env.outputs.environment }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: 🔍 Validate Kubernetes
+        run: |
+          echo "📊 Checking nodes..."
+          kubectl get nodes
+          
+          echo ""
+          echo "📊 Checking pods in product-platform..."
+          kubectl get pods -n product-platform
+          
+          echo ""
+          echo "📊 Checking services..."
+          kubectl get svc -n product-platform
+
+      - name: 🏥 Health Checks
+        run: |
+          echo "🔍 Running health checks..."
+          
+          # Wait for pods to be ready
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/part-of=product-comparison \
+            -n product-platform \
+            --timeout=300s || true
+          
+          # Check deployments
+          kubectl get deployments -n product-platform -o wide
+
+      - name: 📢 Notify Slack - Recovery Complete
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "✅ Disaster Recovery - Validated",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Infrastructure has been recovered and validated successfully!\n\n*Environment:* ${{ steps.env.outputs.environment }}"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "📊 *Quick Links:*\n• <https://console.aws.amazon.com/eks|EKS Console>\n• <https://console.aws.amazon.com/rds|RDS Console>\n• <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow Run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

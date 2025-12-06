@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: product-platform
+  labels:
+    app.kubernetes.io/name: product-platform
+    app.kubernetes.io/part-of: product-comparison
+    istio-injection: disabled
+    purpose: application

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cost-exporter
+  namespace: finops
+  labels:
+    app: cost-exporter
+    app.kubernetes.io/name: cost-exporter
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: finops
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app: cost-exporter
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP

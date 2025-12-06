@@ -1,0 +1,397 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-alertmanager-config
+  namespace: security
+  labels:
+    app: alerting
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    # Templates customizados
+    templates:
+      - '/etc/alertmanager/templates/*.tmpl'
+
+    route:
+      group_by: ['alertname', 'severity', 'namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: 'default-receiver'
+      
+      routes:
+        # Critical alerts - Todos os canais
+        - match:
+            severity: critical
+          receiver: 'critical-receiver'
+          continue: true
+          
+        # Security alerts
+        - match:
+            category: security
+          receiver: 'security-receiver'
+          
+        # Infrastructure alerts
+        - match:
+            category: infrastructure
+          receiver: 'infra-receiver'
+          
+        # Disaster Recovery alerts
+        - match:
+            category: disaster-recovery
+          receiver: 'dr-receiver'
+          group_wait: 0s
+          repeat_interval: 5m
+
+    receivers:
+      # =============================================
+      # DEFAULT RECEIVER - Slack + Discord
+      # =============================================
+      - name: 'default-receiver'
+        slack_configs:
+          - api_url_file: '/etc/alertmanager/secrets/SLACK_WEBHOOK_URL'
+            channel: '#alerts-general'
+            send_resolved: true
+            title: '{{ .Status | toUpper }}: {{ .CommonLabels.alertname }}'
+            text: |
+              *Summary:* {{ .CommonAnnotations.summary }}
+              *Description:* {{ .CommonAnnotations.description }}
+              *Severity:* {{ .CommonLabels.severity }}
+        
+        webhook_configs:
+          # Discord via webhook
+          - url_file: '/etc/alertmanager/secrets/DISCORD_WEBHOOK_URL'
+            send_resolved: true
+            http_config:
+              follow_redirects: true
+      
+      # =============================================
+      # CRITICAL RECEIVER - Slack + Discord + PagerDuty
+      # =============================================
+      - name: 'critical-receiver'
+        slack_configs:
+          - api_url_file: '/etc/alertmanager/secrets/SLACK_WEBHOOK_URL'
+            channel: '#alerts-critical'
+            send_resolved: true
+            color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+            title: '🚨 CRITICAL: {{ .CommonLabels.alertname }}'
+            text: |
+              *Alert:* {{ .CommonAnnotations.summary }}
+              *Description:* {{ .CommonAnnotations.description }}
+              *Namespace:* {{ .CommonLabels.namespace }}
+              *Action Required:* Immediate attention needed!
+        
+        webhook_configs:
+          - url_file: '/etc/alertmanager/secrets/DISCORD_WEBHOOK_URL'
+            send_resolved: true
+        
+        # pagerduty_configs:
+        #   - service_key_file: '/etc/alertmanager/secrets/PAGERDUTY_SERVICE_KEY'
+        #     severity: critical
+        #     description: '{{ .CommonAnnotations.summary }}'
+        #     details:
+        #       alertname: '{{ .CommonLabels.alertname }}'
+        #       namespace: '{{ .CommonLabels.namespace }}'
+        #       severity: '{{ .CommonLabels.severity }}'
+      
+      # =============================================
+      # SECURITY RECEIVER - Slack + Discord
+      # =============================================
+      - name: 'security-receiver'
+        slack_configs:
+          - api_url_file: '/etc/alertmanager/secrets/SLACK_WEBHOOK_URL'
+            channel: '#alerts-security'
+            send_resolved: true
+            color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+            title: '🔐 SECURITY: {{ .CommonLabels.alertname }}'
+            text: |
+              *Alert:* {{ .CommonAnnotations.summary }}
+              *Source:* {{ .CommonLabels.source }}
+              *Details:* {{ .CommonAnnotations.description }}
+        
+        webhook_configs:
+          - url_file: '/etc/alertmanager/secrets/DISCORD_WEBHOOK_URL'
+            send_resolved: true
+      
+      # =============================================
+      # INFRASTRUCTURE RECEIVER - Slack + Discord
+      # =============================================
+      - name: 'infra-receiver'
+        slack_configs:
+          - api_url_file: '/etc/alertmanager/secrets/SLACK_WEBHOOK_URL'
+            channel: '#alerts-infrastructure'
+            send_resolved: true
+            title: '🏗️ INFRA: {{ .CommonLabels.alertname }}'
+            text: |
+              *Alert:* {{ .CommonAnnotations.summary }}
+              *Component:* {{ .CommonLabels.component }}
+              *Details:* {{ .CommonAnnotations.description }}
+        
+        webhook_configs:
+          - url_file: '/etc/alertmanager/secrets/DISCORD_WEBHOOK_URL'
+            send_resolved: true
+      
+      # =============================================
+      # DISASTER RECOVERY RECEIVER - Todos + Auto-trigger
+      # =============================================
+      - name: 'dr-receiver'
+        slack_configs:
+          - api_url_file: '/etc/alertmanager/secrets/SLACK_WEBHOOK_URL'
+            channel: '#alerts-disaster-recovery'
+            send_resolved: true
+            color: 'danger'
+            title: '🆘 DISASTER RECOVERY: {{ .CommonLabels.alertname }}'
+            text: |
+              *CRITICAL INFRASTRUCTURE FAILURE*
+              *Alert:* {{ .CommonAnnotations.summary }}
+              *Component:* {{ .CommonLabels.component }}
+              *Runbook:* {{ .CommonAnnotations.runbook_url }}
+              *Auto-Recovery:* Terraform pipeline will be triggered
+        
+        webhook_configs:
+          # Discord
+          - url_file: '/etc/alertmanager/secrets/DISCORD_WEBHOOK_URL'
+            send_resolved: true
+          
+          # DR Controller trigger
+          - url: 'http://disaster-recovery-controller.security:8080/trigger'
+            send_resolved: false
+        
+        # pagerduty_configs:
+        #   - service_key_file: '/etc/alertmanager/secrets/PAGERDUTY_SERVICE_KEY'
+        #     severity: critical
+        #     description: 'DR Alert: {{ .CommonAnnotations.summary }}'
+
+    inhibit_rules:
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'namespace']
+      
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'info'
+        equal: ['alertname', 'namespace']
+---
+# =============================================
+# DISCORD WEBHOOK ADAPTER
+# Converte alertas do Alertmanager para formato Discord
+# =============================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discord-webhook-adapter
+  namespace: security
+  labels:
+    app: discord-adapter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discord-adapter
+  template:
+    metadata:
+      labels:
+        app: discord-adapter
+    spec:
+      containers:
+        - name: adapter
+          image: python:3.11-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install flask requests
+              python /app/adapter.py
+          
+          ports:
+            - name: http
+              containerPort: 9095
+              protocol: TCP
+          
+          env:
+            - name: DISCORD_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: discord-webhook
+                  key: DISCORD_WEBHOOK_URL
+          
+          volumeMounts:
+            - name: adapter-script
+              mountPath: /app/adapter.py
+              subPath: adapter.py
+          
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+      
+      volumes:
+        - name: adapter-script
+          configMap:
+            name: discord-adapter-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: discord-adapter-script
+  namespace: security
+data:
+  adapter.py: |
+    #!/usr/bin/env python3
+    """
+    Discord Webhook Adapter for Alertmanager
+    Converts Alertmanager webhook format to Discord embed format
+    """
+    import os
+    import json
+    import requests
+    from flask import Flask, request, jsonify
+    from datetime import datetime
+    
+    app = Flask(__name__)
+    
+    DISCORD_WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL')
+    
+    # Severity to color mapping
+    SEVERITY_COLORS = {
+        'critical': 0xFF0000,  # Red
+        'error': 0xFF4500,     # OrangeRed
+        'warning': 0xFFA500,   # Orange
+        'info': 0x00BFFF,      # DeepSkyBlue
+    }
+    
+    # Severity to emoji mapping
+    SEVERITY_EMOJI = {
+        'critical': '🚨',
+        'error': '❌',
+        'warning': '⚠️',
+        'info': 'ℹ️',
+    }
+    
+    def create_discord_embed(alert, status):
+        """Create Discord embed from Alertmanager alert"""
+        labels = alert.get('labels', {})
+        annotations = alert.get('annotations', {})
+        
+        severity = labels.get('severity', 'info')
+        color = SEVERITY_COLORS.get(severity, 0x808080)
+        emoji = SEVERITY_EMOJI.get(severity, '📢')
+        
+        status_emoji = '🔥' if status == 'firing' else '✅'
+        
+        embed = {
+            'title': f"{status_emoji} {emoji} {labels.get('alertname', 'Unknown Alert')}",
+            'color': color if status == 'firing' else 0x00FF00,
+            'fields': [
+                {
+                    'name': '📋 Status',
+                    'value': status.upper(),
+                    'inline': True
+                },
+                {
+                    'name': '⚡ Severity',
+                    'value': severity.upper(),
+                    'inline': True
+                },
+                {
+                    'name': '📦 Namespace',
+                    'value': labels.get('namespace', 'N/A'),
+                    'inline': True
+                },
+                {
+                    'name': '📝 Summary',
+                    'value': annotations.get('summary', 'No summary provided')[:1024],
+                    'inline': False
+                },
+                {
+                    'name': '📖 Description',
+                    'value': annotations.get('description', 'No description provided')[:1024],
+                    'inline': False
+                }
+            ],
+            'footer': {
+                'text': f"Product Comparison Platform | {labels.get('instance', 'N/A')}"
+            },
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Add runbook if available
+        if annotations.get('runbook_url'):
+            embed['fields'].append({
+                'name': '📚 Runbook',
+                'value': f"[View Runbook]({annotations['runbook_url']})",
+                'inline': False
+            })
+        
+        return embed
+    
+    @app.route('/webhook', methods=['POST'])
+    def webhook():
+        """Handle Alertmanager webhook"""
+        try:
+            data = request.json
+            
+            if not data:
+                return jsonify({'error': 'No data received'}), 400
+            
+            status = data.get('status', 'unknown')
+            alerts = data.get('alerts', [])
+            
+            embeds = []
+            for alert in alerts[:10]:  # Discord limit: 10 embeds
+                embed = create_discord_embed(alert, alert.get('status', status))
+                embeds.append(embed)
+            
+            if embeds:
+                discord_payload = {
+                    'username': 'AlertManager',
+                    'avatar_url': 'https://prometheus.io/assets/favicons/android-chrome-192x192.png',
+                    'embeds': embeds
+                }
+                
+                response = requests.post(
+                    DISCORD_WEBHOOK_URL,
+                    json=discord_payload,
+                    headers={'Content-Type': 'application/json'}
+                )
+                
+                if response.status_code not in [200, 204]:
+                    print(f"Discord error: {response.status_code} - {response.text}")
+                    return jsonify({'error': 'Discord webhook failed'}), 500
+            
+            return jsonify({'status': 'ok'}), 200
+            
+        except Exception as e:
+            print(f"Error processing webhook: {e}")
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/health', methods=['GET'])
+    def health():
+        return jsonify({'status': 'healthy'}), 200
+    
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', port=9095)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discord-webhook-adapter
+  namespace: security
+  labels:
+    app: discord-adapter
+spec:
+  type: ClusterIP
+  selector:
+    app: discord-adapter
+  ports:
+    - name: http
+      port: 9095
+      targetPort: 9095

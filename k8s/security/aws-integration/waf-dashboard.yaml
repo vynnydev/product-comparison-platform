@@ -1,0 +1,608 @@
+# ============================================
+# WAF DASHBOARD & METRICS EXPORTER
+# Exporta métricas do WAF para Prometheus
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: waf-exporter-config
+  namespace: security
+  labels:
+    app: waf-exporter
+    app.kubernetes.io/name: waf-exporter
+    app.kubernetes.io/part-of: aws-integration
+data:
+  config.yaml: |
+    # WAF Metrics Exporter Configuration
+    
+    aws:
+      region: us-east-1
+    
+    waf:
+      # Web ACL ARN - atualizar com o ARN real
+      web_acl_arn: "arn:aws:wafv2:us-east-1:347277718217:regional/webacl/product-comparison-waf/xxxxxxxx"
+      
+      # Métricas a coletar
+      metrics:
+        - name: AllowedRequests
+          stat: Sum
+        - name: BlockedRequests
+          stat: Sum
+        - name: CountedRequests
+          stat: Sum
+        - name: PassedRequests
+          stat: Sum
+    
+    # Regras específicas para monitorar
+    rules:
+      - name: "AWS-AWSManagedRulesCommonRuleSet"
+        label: "common-rules"
+      - name: "AWS-AWSManagedRulesSQLiRuleSet"
+        label: "sqli-rules"
+      - name: "AWS-AWSManagedRulesKnownBadInputsRuleSet"
+        label: "bad-inputs"
+      - name: "RateLimit"
+        label: "rate-limit"
+    
+    # Intervalo de coleta
+    scrape_interval: 60s
+    
+    # Prometheus metrics port
+    metrics_port: 9090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: waf-metrics-exporter
+  namespace: security
+  labels:
+    app: waf-exporter
+    app.kubernetes.io/name: waf-exporter
+    app.kubernetes.io/part-of: aws-integration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: waf-exporter
+  template:
+    metadata:
+      labels:
+        app: waf-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: waf-exporter-sa
+      
+      containers:
+        - name: exporter
+          image: python:3.11-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install boto3 prometheus_client pyyaml
+              python /app/exporter.py
+          
+          ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          
+          env:
+            - name: AWS_REGION
+              value: "us-east-1"
+          
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+            - name: exporter-script
+              mountPath: /app/exporter.py
+              subPath: exporter.py
+          
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "100m"
+              memory: "256Mi"
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      
+      volumes:
+        - name: config
+          configMap:
+            name: waf-exporter-config
+        - name: exporter-script
+          configMap:
+            name: waf-exporter-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: waf-exporter-script
+  namespace: security
+  labels:
+    app: waf-exporter
+data:
+  exporter.py: |
+    #!/usr/bin/env python3
+    """
+    AWS WAF Metrics Exporter for Prometheus
+    """
+    import os
+    import time
+    import boto3
+    import yaml
+    from datetime import datetime, timedelta
+    from prometheus_client import start_http_server, Gauge, Counter, REGISTRY
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    import threading
+    
+    # Configuration
+    AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+    METRICS_PORT = 9090
+    SCRAPE_INTERVAL = 60
+    
+    # Initialize AWS clients
+    cloudwatch = boto3.client('cloudwatch', region_name=AWS_REGION)
+    wafv2 = boto3.client('wafv2', region_name=AWS_REGION)
+    
+    # Prometheus metrics
+    waf_allowed_requests = Gauge('waf_allowed_requests_total', 'Total allowed requests', ['web_acl', 'rule'])
+    waf_blocked_requests = Gauge('waf_blocked_requests_total', 'Total blocked requests', ['web_acl', 'rule'])
+    waf_counted_requests = Gauge('waf_counted_requests_total', 'Total counted requests', ['web_acl', 'rule'])
+    waf_rate_limited = Gauge('waf_rate_limited_requests_total', 'Total rate limited requests', ['web_acl'])
+    
+    # Attack type counters
+    waf_sqli_blocked = Gauge('waf_sqli_attacks_blocked', 'SQL Injection attacks blocked')
+    waf_xss_blocked = Gauge('waf_xss_attacks_blocked', 'XSS attacks blocked')
+    waf_bad_inputs_blocked = Gauge('waf_bad_inputs_blocked', 'Bad inputs blocked')
+    
+    # Health status
+    health_status = {'healthy': True, 'last_scrape': None}
+    
+    def get_waf_metrics(web_acl_name='product-comparison-waf'):
+        """Get WAF metrics from CloudWatch"""
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(minutes=5)
+        
+        metrics = [
+            ('AllowedRequests', waf_allowed_requests),
+            ('BlockedRequests', waf_blocked_requests),
+            ('CountedRequests', waf_counted_requests),
+        ]
+        
+        for metric_name, gauge in metrics:
+            try:
+                response = cloudwatch.get_metric_statistics(
+                    Namespace='AWS/WAFV2',
+                    MetricName=metric_name,
+                    Dimensions=[
+                        {'Name': 'WebACL', 'Value': web_acl_name},
+                        {'Name': 'Region', 'Value': AWS_REGION},
+                        {'Name': 'Rule', 'Value': 'ALL'}
+                    ],
+                    StartTime=start_time,
+                    EndTime=end_time,
+                    Period=300,
+                    Statistics=['Sum']
+                )
+                
+                if response['Datapoints']:
+                    value = response['Datapoints'][-1]['Sum']
+                    gauge.labels(web_acl=web_acl_name, rule='ALL').set(value)
+                    
+            except Exception as e:
+                print(f"Error getting {metric_name}: {e}")
+        
+        # Get rule-specific metrics
+        rules = [
+            ('AWS-AWSManagedRulesSQLiRuleSet', waf_sqli_blocked),
+            ('AWS-AWSManagedRulesCommonRuleSet', waf_xss_blocked),
+            ('AWS-AWSManagedRulesKnownBadInputsRuleSet', waf_bad_inputs_blocked),
+        ]
+        
+        for rule_name, gauge in rules:
+            try:
+                response = cloudwatch.get_metric_statistics(
+                    Namespace='AWS/WAFV2',
+                    MetricName='BlockedRequests',
+                    Dimensions=[
+                        {'Name': 'WebACL', 'Value': web_acl_name},
+                        {'Name': 'Region', 'Value': AWS_REGION},
+                        {'Name': 'Rule', 'Value': rule_name}
+                    ],
+                    StartTime=start_time,
+                    EndTime=end_time,
+                    Period=300,
+                    Statistics=['Sum']
+                )
+                
+                if response['Datapoints']:
+                    value = response['Datapoints'][-1]['Sum']
+                    gauge.set(value)
+                    
+            except Exception as e:
+                print(f"Error getting metrics for {rule_name}: {e}")
+    
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == '/health':
+                self.send_response(200)
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(b'healthy')
+            elif self.path == '/metrics':
+                # Handled by prometheus_client
+                pass
+            else:
+                self.send_response(404)
+                self.end_headers()
+        
+        def log_message(self, format, *args):
+            pass
+    
+    def scrape_loop():
+        """Main scraping loop"""
+        while True:
+            try:
+                get_waf_metrics()
+                health_status['last_scrape'] = datetime.utcnow().isoformat()
+                health_status['healthy'] = True
+            except Exception as e:
+                print(f"Scrape error: {e}")
+                health_status['healthy'] = False
+            
+            time.sleep(SCRAPE_INTERVAL)
+    
+    def main():
+        """Main entry point"""
+        print(f"Starting WAF Metrics Exporter on port {METRICS_PORT}...")
+        
+        # Start Prometheus metrics server
+        start_http_server(METRICS_PORT)
+        
+        # Start scraping in background
+        scrape_thread = threading.Thread(target=scrape_loop, daemon=True)
+        scrape_thread.start()
+        
+        # Keep main thread alive
+        while True:
+            time.sleep(60)
+    
+    if __name__ == '__main__':
+        main()
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: waf-exporter
+  namespace: security
+  labels:
+    app: waf-exporter
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+spec:
+  type: ClusterIP
+  selector:
+    app: waf-exporter
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: waf-exporter-sa
+  namespace: security
+  annotations:
+    # IRSA para acessar WAF e CloudWatch
+    eks.amazonaws.com/role-arn: arn:aws:iam::347277718217:role/product-comparison-dev-waf-exporter-role
+---
+# ============================================
+# GRAFANA DASHBOARD - WAF
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: waf-grafana-dashboard
+  namespace: security
+  labels:
+    app: waf-dashboard
+    grafana_dashboard: "true"
+data:
+  waf-dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 100},
+                  {"color": "red", "value": 500}
+                ]
+              }
+            }
+          },
+          "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "waf_blocked_requests_total{rule=\"ALL\"}",
+              "legendFormat": "Blocked"
+            }
+          ],
+          "title": "🛡️ Blocked Requests",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null}
+                ]
+              }
+            }
+          },
+          "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+          "id": 2,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "waf_allowed_requests_total{rule=\"ALL\"}",
+              "legendFormat": "Allowed"
+            }
+          ],
+          "title": "✅ Allowed Requests",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "red", "value": 1}
+                ]
+              }
+            }
+          },
+          "gridPos": {"h": 6, "w": 4, "x": 12, "y": 0},
+          "id": 3,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "waf_sqli_attacks_blocked",
+              "legendFormat": "SQLi"
+            }
+          ],
+          "title": "💉 SQLi Blocked",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "red", "value": 1}
+                ]
+              }
+            }
+          },
+          "gridPos": {"h": 6, "w": 4, "x": 16, "y": 0},
+          "id": 4,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "waf_xss_attacks_blocked",
+              "legendFormat": "XSS"
+            }
+          ],
+          "title": "🔧 XSS Blocked",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "red", "value": 1}
+                ]
+              }
+            }
+          },
+          "gridPos": {"h": 6, "w": 4, "x": 20, "y": 0},
+          "id": 5,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "waf_bad_inputs_blocked",
+              "legendFormat": "Bad Inputs"
+            }
+          ],
+          "title": "⚠️ Bad Inputs Blocked",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {"type": "linear"},
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {"group": "A", "mode": "none"},
+                "thresholdsStyle": {"mode": "off"}
+              },
+              "mappings": [],
+              "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+              "unit": "short"
+            }
+          },
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 6},
+          "id": 6,
+          "targets": [
+            {
+              "expr": "rate(waf_blocked_requests_total{rule=\"ALL\"}[5m])",
+              "legendFormat": "Blocked/min"
+            },
+            {
+              "expr": "rate(waf_allowed_requests_total{rule=\"ALL\"}[5m])",
+              "legendFormat": "Allowed/min"
+            }
+          ],
+          "title": "📊 Request Rate Over Time",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "tags": ["waf", "security", "aws"],
+      "templating": {"list": []},
+      "time": {"from": "now-6h", "to": "now"},
+      "timepicker": {},
+      "timezone": "",
+      "title": "🛡️ AWS WAF Dashboard",
+      "uid": "waf-dashboard",
+      "version": 1
+    }

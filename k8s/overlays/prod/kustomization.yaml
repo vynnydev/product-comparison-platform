@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: product-platform
+
+resources:
+  - ../../apps
+
+configMapGenerator:
+  - name: env-config
+    literals:
+      - ENVIRONMENT=staging
+      - LOG_LEVEL=INFO
+      - SPRING_PROFILES_ACTIVE=staging,cloud
+
+patches:
+  - path: patches/replicas.yaml
+  - path: patches/resources.yaml
+
+commonLabels:
+  environment: staging
+
+images:
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-product-service
+    newName: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-staging-product-service
+    newTag: staging
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-ai-service
+    newName: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-staging-ai-service
+    newTag: staging
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-search-service
+    newName: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-staging-search-service
+    newTag: staging
+  - name: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-dev-frontend
+    newName: 347277718217.dkr.ecr.us-east-1.amazonaws.com/product-comparison-staging-frontend
+    newTag: staging

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-service-config
+  namespace: product-platform
+  labels:
+    app: ai-service
+    app.kubernetes.io/name: ai-service
+    app.kubernetes.io/part-of: product-comparison
+data:
+  SPRING_PROFILES_ACTIVE: "cloud"
+  SERVER_PORT: "8081"
+  
+  # Database
+  DB_NAME: "aidb"
+  DB_PORT: "5432"
+  
+  # RabbitMQ
+  RABBITMQ_PORT: "5671"
+  RABBITMQ_SSL_ENABLED: "true"
+  
+  # AI Provider
+  AI_PROVIDER: "bedrock"
+  BEDROCK_MODEL_ID: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+  
+  # Queues
+  RABBITMQ_QUEUE_PRODUCT_CREATED: "ai.product.created"
+  RABBITMQ_EXCHANGE_PRODUCTS: "products.exchange"
+  RABBITMQ_EXCHANGE_ANALYSIS: "analysis.exchange"
