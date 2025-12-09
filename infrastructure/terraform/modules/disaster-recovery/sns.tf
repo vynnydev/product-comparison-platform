@@ -63,84 +63,68 @@ resource "aws_sns_topic_subscription" "slack" {
 
 # RDS - High CPU
 resource "aws_cloudwatch_metric_alarm" "rds_cpu" {
-  count               = var.rds_identifier != "" ? 1 : 0
-  alarm_name          = "${local.name_prefix}-rds-high-cpu"
+  count               = var.enable_rds_alarms ? 1 : 0
+  alarm_name          = "${var.project_name}-${var.environment}-rds-high-cpu"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 3
+  evaluation_periods  = 2
   metric_name         = "CPUUtilization"
   namespace           = "AWS/RDS"
   period              = 300
   statistic           = "Average"
   threshold           = 80
   alarm_description   = "RDS CPU utilization is too high"
-  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.dr_alerts.arn]
+  ok_actions          = [aws_sns_topic.dr_alerts.arn]
 
   dimensions = {
     DBInstanceIdentifier = var.rds_identifier
   }
 
-  alarm_actions = [aws_sns_topic.dr_alerts.arn]
-  ok_actions    = [aws_sns_topic.dr_alerts.arn]
-
-  tags = {
-    Name        = "${local.name_prefix}-rds-cpu-alarm"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
+  tags = local.tags
 }
 
 # RDS - Low Storage
 resource "aws_cloudwatch_metric_alarm" "rds_storage" {
-  count               = var.rds_identifier != "" ? 1 : 0
-  alarm_name          = "${local.name_prefix}-rds-low-storage"
+  count               = var.enable_rds_alarms ? 1 : 0
+  alarm_name          = "${var.project_name}-${var.environment}-rds-low-storage"
   comparison_operator = "LessThanThreshold"
-  evaluation_periods  = 1
+  evaluation_periods  = 2
   metric_name         = "FreeStorageSpace"
   namespace           = "AWS/RDS"
   period              = 300
   statistic           = "Average"
-  threshold           = 5368709120 # 5GB in bytes
-  alarm_description   = "RDS storage is running low"
-  treat_missing_data  = "notBreaching"
+  threshold           = 5368709120  # 5GB em bytes
+  alarm_description   = "RDS free storage space is too low"
+  alarm_actions       = [aws_sns_topic.dr_alerts.arn]
+  ok_actions          = [aws_sns_topic.dr_alerts.arn]
 
   dimensions = {
     DBInstanceIdentifier = var.rds_identifier
   }
 
-  alarm_actions = [aws_sns_topic.dr_alerts.arn]
-
-  tags = {
-    Name        = "${local.name_prefix}-rds-storage-alarm"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
+  tags = local.tags
 }
 
 # RDS - Connection Count
 resource "aws_cloudwatch_metric_alarm" "rds_connections" {
-  count               = var.rds_identifier != "" ? 1 : 0
-  alarm_name          = "${local.name_prefix}-rds-high-connections"
+  count               = var.enable_rds_alarms ? 1 : 0
+  alarm_name          = "${var.project_name}-${var.environment}-rds-high-connections"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
   metric_name         = "DatabaseConnections"
   namespace           = "AWS/RDS"
   period              = 300
   statistic           = "Average"
-  threshold           = var.rds_max_connections * 0.8
-  alarm_description   = "RDS connection count is high"
-  treat_missing_data  = "notBreaching"
+  threshold           = 100
+  alarm_description   = "RDS connection count is too high"
+  alarm_actions       = [aws_sns_topic.dr_alerts.arn]
+  ok_actions          = [aws_sns_topic.dr_alerts.arn]
 
   dimensions = {
     DBInstanceIdentifier = var.rds_identifier
   }
 
-  alarm_actions = [aws_sns_topic.dr_alerts.arn]
-
-  tags = {
-    Name        = "${local.name_prefix}-rds-connections-alarm"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
+  tags = local.tags
 }
 
 # EKS - Node Not Ready
@@ -170,10 +154,12 @@ resource "aws_cloudwatch_metric_alarm" "eks_nodes" {
   }
 }
 
-# ElastiCache - High Memory
+# ============================================
+# ELASTICACHE ALARMS - High Memory
+# ============================================
 resource "aws_cloudwatch_metric_alarm" "redis_memory" {
-  count               = var.elasticache_cluster_id != "" ? 1 : 0
-  alarm_name          = "${local.name_prefix}-redis-high-memory"
+  count               = var.enable_elasticache_alarms ? 1 : 0
+  alarm_name          = "${var.project_name}-${var.environment}-redis-high-memory"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
   metric_name         = "DatabaseMemoryUsagePercentage"
@@ -181,18 +167,13 @@ resource "aws_cloudwatch_metric_alarm" "redis_memory" {
   period              = 300
   statistic           = "Average"
   threshold           = 80
-  alarm_description   = "Redis memory usage is high"
-  treat_missing_data  = "notBreaching"
+  alarm_description   = "Redis memory usage is too high"
+  alarm_actions       = [aws_sns_topic.dr_alerts.arn]
+  ok_actions          = [aws_sns_topic.dr_alerts.arn]
 
   dimensions = {
     CacheClusterId = var.elasticache_cluster_id
   }
 
-  alarm_actions = [aws_sns_topic.dr_alerts.arn]
-
-  tags = {
-    Name        = "${local.name_prefix}-redis-memory-alarm"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
+  tags = local.tags
 }

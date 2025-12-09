@@ -23,7 +23,7 @@ kubectl create namespace data --dry-run=client -o yaml | kubectl apply -f -
 
 echo ""
 echo -e "${YELLOW}💾 Applying OpenSearch Proxy...${NC}"
-kubectl apply -k data/opensearch-proxy/
+kubectl apply -k ../../k8s/data/opensearch-proxy/
 
 echo ""
 echo -e "${YELLOW}⏳ Waiting for rollout...${NC}"

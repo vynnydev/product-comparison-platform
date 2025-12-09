@@ -75,12 +75,19 @@ resource "aws_backup_plan" "main" {
 # AWS BACKUP - Selection (RDS)
 # ============================================
 resource "aws_backup_selection" "rds" {
-  count        = var.rds_arn != "" ? 1 : 0
-  name         = "${local.name_prefix}-rds-backup"
-  plan_id      = aws_backup_plan.main.id
+  count        = var.enable_rds_backup ? 1 : 0
+  name         = "${var.project_name}-${var.environment}-rds-backup"
   iam_role_arn = aws_iam_role.backup.arn
+  plan_id      = aws_backup_plan.main.id
 
   resources = [var.rds_arn]
+
+  condition {
+    string_equals {
+      key   = "aws:ResourceTag/Project"
+      value = var.project_name
+    }
+  }
 }
 
 # ============================================

@@ -60,7 +60,7 @@ echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}📦 [1/4] Deploying Product Service...${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-kubectl apply -k apps/product-service/
+kubectl apply -k ../../k8s/apps/product-service/
 echo -e "${GREEN}✅ Product Service aplicado${NC}"
 echo ""
 
@@ -68,7 +68,7 @@ echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}🤖 [2/4] Deploying AI Service...${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-kubectl apply -k apps/ai-service/
+kubectl apply -k ../../k8s/apps/ai-service/
 echo -e "${GREEN}✅ AI Service aplicado${NC}"
 echo ""
 
@@ -76,7 +76,7 @@ echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}🔍 [3/4] Deploying Search Service...${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-kubectl apply -k apps/search-service/
+kubectl apply -k ../../k8s/apps/search-service/
 echo -e "${GREEN}✅ Search Service aplicado${NC}"
 echo ""
 
@@ -84,7 +84,7 @@ echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}🎨 [4/4] Deploying Frontend...${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-kubectl apply -k apps/frontend/
+kubectl apply -k ../../k8s/apps/frontend/
 echo -e "${GREEN}✅ Frontend aplicado${NC}"
 echo ""
 

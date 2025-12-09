@@ -103,3 +103,44 @@ variable "elasticache_cluster_id" {
 #   default     = ""
 #   sensitive   = true
 # }
+
+# ============================================
+# ENABLE FLAGS (para evitar count dinâmico)
+# ============================================
+
+variable "enable_rds_backup" {
+  description = "Habilitar backup do RDS"
+  type        = bool
+  default     = true
+}
+
+variable "enable_rds_alarms" {
+  description = "Habilitar alarmes do RDS"
+  type        = bool
+  default     = true
+}
+
+variable "enable_elasticache_alarms" {
+  description = "Habilitar alarmes do ElastiCache"
+  type        = bool
+  default     = true
+}
+
+variable "enable_eks_alarms" {
+  description = "Habilitar alarmes do EKS"
+  type        = bool
+  default     = true
+}
+
+variable "backup_retention_days" {
+  description = "Número de dias para reter backups"
+  type        = number
+  default     = 90
+}
+
+variable "discord_webhook_url" {
+  description = "Discord webhook URL para alertas"
+  type        = string
+  default     = ""
+  sensitive   = true
+}

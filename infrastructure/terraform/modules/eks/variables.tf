@@ -50,7 +50,7 @@ variable "node_instance_types" {
 variable "desired_size" {
   description = "Número desejado de nodes"
   type        = number
-  default     = 3  # Changed from 2 to 3
+  default     = 4  # Changed from 2 to 3
 }
 
 variable "min_size" {
@@ -62,7 +62,7 @@ variable "min_size" {
 variable "max_size" {
   description = "Número máximo de nodes"
   type        = number
-  default     = 5  # Changed from 4 to 5 for auto-scaling headroom
+  default     = 6  # Changed from 4 to 5 for auto-scaling headroom
 }
 
 # ============================================

@@ -15,9 +15,9 @@ data:
   DB_SSL_MODE: "require"
   
   # ============================================
-  # RABBITMQ - Amazon MQ
+  # RABBITMQ - Amazon MQ (ATUALIZADO)
   # ============================================
-  RABBITMQ_HOST: "b-c9d83fd2-98e9-4740-b3b4-1bd04611e3a3.mq.us-east-1.on.aws"
+  RABBITMQ_HOST: "b-c2117059-e394-4ac8-8602-280b973a914b.mq.us-east-1.on.aws"
   RABBITMQ_PORT: "5671"
   RABBITMQ_SSL_ENABLED: "true"
   RABBITMQ_VHOST: "/"
@@ -43,12 +43,12 @@ data:
   AWS_ACCOUNT_ID: "347277718217"
   
   # ============================================
-  # AI SERVICE
+  # AI SERVICE (ATUALIZADO)
   # ============================================
-  AI_API_URL: "https://pncx5lds5i.execute-api.us-east-1.amazonaws.com/prod/ai"
+  AI_API_URL: "https://7tiu4e59mk.execute-api.us-east-1.amazonaws.com/prod/ai"
   
   # ============================================
-  # FRONTEND
+  # FRONTEND (ATUALIZADO)
   # ============================================
-  FRONTEND_URL: "https://d2r9vjnwtewxe0.cloudfront.net"
-  CLOUDFRONT_DISTRIBUTION_ID: "E1G50GCXAK3YC3"
+  FRONTEND_URL: "https://d2cdoc4oqmo8k2.cloudfront.net"
+  CLOUDFRONT_DISTRIBUTION_ID: "E2A1M2K22PVI7G"

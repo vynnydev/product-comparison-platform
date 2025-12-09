@@ -384,22 +384,29 @@ module "disaster_recovery" {
   environment  = var.environment
 
   # Backup settings
-  backup_cold_storage_after = var.dr_backup_cold_storage_after
-  backup_delete_after       = var.dr_backup_delete_after
+  backup_retention_days      = var.backup_retention_days
+  backup_cold_storage_after  = var.backup_cold_storage_after
+  backup_delete_after        = var.backup_delete_after
+  dr_region_vault_arn        = var.dr_region_vault_arn
 
-  # Resources to backup
-  rds_arn = module.rds.db_instance_arn
+  # Resource identifiers
+  rds_arn                 = module.rds.db_instance_arn
+  rds_identifier          = module.rds.db_instance_id
+  elasticache_cluster_id  = module.elasticache.replication_group_id
+  eks_cluster_name        = module.eks.cluster_name
+
+  # ADICIONAR ESTAS LINHAS - Flags booleanas
+  enable_rds_backup         = true
+  enable_rds_alarms         = true
+  enable_elasticache_alarms = true
+  enable_eks_alarms         = true
 
   # Notifications
-  alert_emails      = var.dr_alert_emails
-  slack_webhook_url = var.dr_slack_webhook_url
+  slack_webhook_url   = var.dr_slack_webhook_url
+  discord_webhook_url = var.discord_webhook_url
+  alert_emails        = var.alert_emails
 
-  # Monitoring
-  rds_identifier         = module.rds.db_instance_id
-  rds_max_connections    = 100
-  eks_cluster_name       = module.eks.cluster_name
-  eks_min_nodes          = var.node_min_size
-  elasticache_cluster_id = module.elasticache.replication_group_id
+  depends_on = [module.rds, module.elasticache, module.eks]
 }
 
 # ============================================
@@ -410,8 +417,14 @@ module "security_iam" {
 
   project_name           = var.project_name
   environment            = var.environment
-  eks_oidc_issuer_url = module.eks.oidc_issuer_url
+  
+  # Passar ambos: ARN e URL
+  eks_oidc_provider_arn  = module.eks.oidc_provider_arn
+  eks_oidc_issuer_url    = module.eks.oidc_issuer_url
+  
   terraform_state_bucket = var.terraform_state_bucket
+
+  depends_on = [module.eks]
 }
 
 # ============================================
@@ -437,7 +450,7 @@ module "finops" {
   anomaly_threshold_amount = var.finops_anomaly_threshold
 
   # Notifications
-  alert_emails      = var.alert_email_addresses
+  alert_emails      = var.alert_emails
   slack_webhook_url = var.slack_webhook_url
   discord_webhook_url = var.discord_webhook_url
 }

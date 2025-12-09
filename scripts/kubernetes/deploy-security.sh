@@ -18,11 +18,11 @@ K8S_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$K8S_DIR"
 
 echo -e "${YELLOW}📁 Creating security namespace...${NC}"
-kubectl apply -f security/namespace.yaml
+kubectl apply -f ../../k8s/security/namespace.yaml
 
 echo ""
 echo -e "${YELLOW}🔐 Deploying Security Stack...${NC}"
-kubectl apply -k security/
+kubectl apply -k ../../k8s/security/
 
 echo ""
 echo -e "${YELLOW}⏳ Waiting for pods to be ready...${NC}"

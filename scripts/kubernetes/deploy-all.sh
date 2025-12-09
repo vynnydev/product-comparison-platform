@@ -45,21 +45,21 @@ case $option in
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${YELLOW}📊 [1/4] Deploying Monitoring Stack...${NC}"
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        kubectl apply -k monitoring/
+        kubectl apply -k ../../k8s/monitoring/
         echo -e "${GREEN}✅ Monitoring aplicado${NC}"
         
         echo ""
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${YELLOW}🔄 [2/4] Deploying ArgoCD...${NC}"
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        kubectl apply -k argocd/
+        kubectl apply -k ../../k8s/argocd/
         echo -e "${GREEN}✅ ArgoCD aplicado${NC}"
         
         echo ""
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${YELLOW}📦 [3/4] Deploying Microservices & Frontend...${NC}"
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        kubectl apply -k apps/
+        kubectl apply -k ../../k8s/apps/
         echo -e "${GREEN}✅ Apps aplicados${NC}"
         
         echo ""
@@ -67,32 +67,32 @@ case $option in
         echo -e "${YELLOW}💾 [4/4] Deploying Data Tools...${NC}"
         echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         kubectl create namespace data --dry-run=client -o yaml | kubectl apply -f -
-        kubectl apply -k data/
+        kubectl apply -k ../../k8s/data/
         echo -e "${GREEN}✅ Data tools aplicados${NC}"
         ;;
     2)
         echo ""
         echo -e "${YELLOW}📦 Deploying Microservices & Frontend...${NC}"
-        kubectl apply -k apps/
+        kubectl apply -k ../../k8s/apps/
         echo -e "${GREEN}✅ Apps aplicados${NC}"
         ;;
     3)
         echo ""
         echo -e "${YELLOW}📊 Deploying Monitoring Stack...${NC}"
-        kubectl apply -k monitoring/
+        kubectl apply -k ../../k8s/monitoring/
         echo -e "${GREEN}✅ Monitoring aplicado${NC}"
         ;;
     4)
         echo ""
         echo -e "${YELLOW}🔄 Deploying ArgoCD...${NC}"
-        kubectl apply -k argocd/
+        kubectl apply -k ../../k8s/argocd/
         echo -e "${GREEN}✅ ArgoCD aplicado${NC}"
         ;;
     5)
         echo ""
         echo -e "${YELLOW}💾 Deploying Data Tools...${NC}"
         kubectl create namespace data --dry-run=client -o yaml | kubectl apply -f -
-        kubectl apply -k data/
+        kubectl apply -k ../../k8s/data/
         echo -e "${GREEN}✅ Data tools aplicados${NC}"
         ;;
     *)

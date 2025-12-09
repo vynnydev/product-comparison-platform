@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cognitiva-analytics
+  labels:
+    app.kubernetes.io/name: cognitiva-analytics
+    app.kubernetes.io/part-of: challenge
+    environment: production

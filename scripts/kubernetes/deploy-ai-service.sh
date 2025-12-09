@@ -18,7 +18,7 @@ K8S_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$K8S_DIR"
 
 echo -e "${YELLOW}🤖 Applying AI Service...${NC}"
-kubectl apply -k apps/ai-service/
+kubectl apply -k ../../k8s/apps/ai-service/
 
 echo ""
 echo -e "${YELLOW}⏳ Waiting for rollout...${NC}"

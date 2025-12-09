@@ -9,6 +9,9 @@
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
   
+  # Extrair o ID do OIDC da URL (remove https://)
+  oidc_provider_id = replace(var.eks_oidc_issuer_url, "https://", "")
+  
   tags = {
     Name        = "${var.project_name}-${var.environment}"
     Project     = var.project_name
@@ -23,10 +26,10 @@ data "aws_region" "current" {}
 
 # ============================================
 # OIDC PROVIDER DATA
-# ============================================
-data "aws_iam_openid_connect_provider" "eks" {
-  url = var.eks_oidc_issuer_url
-}
+# # ============================================
+# data "aws_iam_openid_connect_provider" "eks" {
+#   url = var.eks_oidc_issuer_url
+# }
 
 # ============================================
 # ROLE: Security Dashboard (Grafana)
@@ -40,13 +43,13 @@ resource "aws_iam_role" "security_dashboard" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = data.aws_iam_openid_connect_provider.eks.arn
+          Federated = var.eks_oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${replace(var.eks_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:security:security-dashboard-sa"
-            "${replace(var.eks_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+            "${local.oidc_provider_id}:sub" = "system:serviceaccount:..."
+            "${local.oidc_provider_id}:aud" = "sts.amazonaws.com"
           }
         }
       }
@@ -140,7 +143,7 @@ resource "aws_iam_role" "guardduty_events" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = data.aws_iam_openid_connect_provider.eks.arn
+          Federated = var.eks_oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
@@ -204,7 +207,7 @@ resource "aws_iam_role" "waf_exporter" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = data.aws_iam_openid_connect_provider.eks.arn
+          Federated = var.eks_oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
@@ -267,7 +270,7 @@ resource "aws_iam_role" "shield_exporter" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = data.aws_iam_openid_connect_provider.eks.arn
+          Federated = var.eks_oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
@@ -331,7 +334,7 @@ resource "aws_iam_role" "disaster_recovery" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = data.aws_iam_openid_connect_provider.eks.arn
+          Federated = var.eks_oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
@@ -431,12 +434,13 @@ resource "aws_iam_role" "cost_exporter" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = data.aws_iam_openid_connect_provider.eks.arn
+          Federated = var.eks_oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${replace(var.eks_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:finops:cost-exporter-sa"
+            "${local.oidc_provider_id}:sub" = "system:serviceaccount:finops:cost-exporter-sa"
+            "${local.oidc_provider_id}:aud" = "sts.amazonaws.com"
           }
         }
       }

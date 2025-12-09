@@ -85,19 +85,19 @@ variable "node_instance_types" {
 variable "node_desired_size" {
   description = "Número desejado de nodes"
   type        = number
-  default     = 3
+  default     = 4
 }
 
 variable "node_min_size" {
   description = "Número mínimo de nodes"
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "node_max_size" {
   description = "Número máximo de nodes"
   type        = number
-  default     = 5
+  default     = 6
 }
 
 variable "node_disk_size" {
@@ -560,6 +560,24 @@ variable "dr_slack_webhook_url" {
   sensitive   = true
 }
 
+variable "backup_retention_days" {
+  description = "Número de dias para reter backups"
+  type        = number
+  default     = 90
+}
+
+variable "backup_cold_storage_after" {
+  description = "Dias após os quais mover backup para cold storage"
+  type        = number
+  default     = 30
+}
+
+variable "backup_delete_after" {
+  description = "Dias após os quais deletar backup (deve ser >= cold_storage + 90)"
+  type        = number
+  default     = 120
+}
+
 # ============================================
 # 🔐 SECURITY IAM VARIABLES
 # ============================================
@@ -595,7 +613,7 @@ variable "discord_webhook_url" {
 #   sensitive   = true
 # }
 
-variable "alert_email_addresses" {
+variable "alert_emails" {
   description = "Lista de emails para alertas"
   type        = list(string)
   default     = []

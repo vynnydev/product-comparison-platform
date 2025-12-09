@@ -5,7 +5,7 @@ echo "🔄 Deploying ArgoCD..."
 echo "======================"
 
 # Install ArgoCD
-kubectl apply -k argocd/
+kubectl apply -k ../../k8s/argocd/
 
 echo ""
 echo "⏳ Waiting for ArgoCD to be ready..."

@@ -4,7 +4,7 @@ set -e
 echo "📊 Deploying Monitoring Stack..."
 echo "================================"
 
-kubectl apply -k monitoring/
+kubectl apply -k ../../k8s/monitoring/
 
 echo ""
 echo "⏳ Waiting for pods to be ready..."

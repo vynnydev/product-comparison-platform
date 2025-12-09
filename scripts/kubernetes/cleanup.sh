@@ -32,32 +32,32 @@ read -p "Opção: " option
 case $option in
     1)
         echo -e "${YELLOW}Removendo Microservices...${NC}"
-        kubectl delete -k apps/ --ignore-not-found
+        kubectl delete -k ../../k8s/apps/ --ignore-not-found
         echo -e "${RED}✅ Microservices removidos${NC}"
         ;;
     2)
         echo -e "${YELLOW}Removendo Monitoring...${NC}"
-        kubectl delete -k monitoring/ --ignore-not-found
+        kubectl delete -k ../../k8s/monitoring/ --ignore-not-found
         echo -e "${RED}✅ Monitoring removido${NC}"
         ;;
     3)
         echo -e "${YELLOW}Removendo ArgoCD...${NC}"
-        kubectl delete -k argocd/ --ignore-not-found
+        kubectl delete -k ../../k8s/argocd/ --ignore-not-found
         echo -e "${RED}✅ ArgoCD removido${NC}"
         ;;
     4)
         echo -e "${YELLOW}Removendo Data Tools...${NC}"
-        kubectl delete -k data/ --ignore-not-found
+        kubectl delete -k ../../k8s/data/ --ignore-not-found
         echo -e "${RED}✅ Data Tools removidos${NC}"
         ;;
     5)
         read -p "Tem certeza que deseja remover TUDO? (yes/no): " confirm
         if [ "$confirm" == "yes" ]; then
             echo -e "${YELLOW}Removendo TUDO...${NC}"
-            kubectl delete -k apps/ --ignore-not-found
-            kubectl delete -k monitoring/ --ignore-not-found
-            kubectl delete -k argocd/ --ignore-not-found
-            kubectl delete -k data/ --ignore-not-found
+            kubectl delete -k ../../k8s/apps/ --ignore-not-found
+            kubectl delete -k ../../k8s/monitoring/ --ignore-not-found
+            kubectl delete -k ../../k8s/argocd/ --ignore-not-found
+            kubectl delete -k ../../k8s/data/ --ignore-not-found
             echo -e "${RED}✅ Tudo removido${NC}"
         else
             echo "Cancelado"

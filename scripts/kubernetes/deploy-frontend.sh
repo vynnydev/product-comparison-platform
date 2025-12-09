@@ -18,7 +18,7 @@ K8S_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$K8S_DIR"
 
 echo -e "${YELLOW}🎨 Applying Frontend...${NC}"
-kubectl apply -k apps/frontend/
+kubectl apply -k ../../k8s/apps/frontend
 
 echo ""
 echo -e "${YELLOW}⏳ Waiting for rollout...${NC}"

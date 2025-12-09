@@ -11,13 +11,12 @@ metadata:
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:347277718217:certificate/fe0f2f22-4b69-4674-b2e4-90665101a010
+    # ATUALIZADO - Novo certificado
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:347277718217:certificate/a23b58b7-fdd4-45b4-b6f7-ff9c5615d093
     alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
-    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
-    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
-    alb.ingress.kubernetes.io/waf-acl-arn: arn:aws:wafv2:us-east-1:347277718217:regional/webacl/product-comparison-dev-waf/05cd160d-0538-43cd-8e54-1b8a0bb7b7ae
+    # ATUALIZADO - Novo WAF ACL
+    alb.ingress.kubernetes.io/waf-acl-arn: arn:aws:wafv2:us-east-1:347277718217:regional/webacl/product-comparison-dev-waf/6bf22e41-6b65-4c5b-8690-9428e4d01674
     alb.ingress.kubernetes.io/group.name: product-comparison
 spec:
   ingressClassName: alb

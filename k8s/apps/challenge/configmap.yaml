@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-config
+  namespace: cognitiva-analytics
+  labels:
+    app.kubernetes.io/part-of: challenge
+data:
+  # Database - RDS PostgreSQL
+  DB_HOST: "product-comparison-dev-postgresql.c0j6s6gus7cz.us-east-1.rds.amazonaws.com"
+  DB_PORT: "5432"
+  DB_NAME: "productdb"
+  DB_SSL_MODE: "require"
+  
+  # Redis - ElastiCache
+  REDIS_HOST: "product-comparison-dev-redis.4k6mni.ng.0001.use1.cache.amazonaws.com"
+  REDIS_PORT: "6379"
+  
+  # RabbitMQ - Amazon MQ
+  RABBITMQ_HOST: "b-c2117059-e394-4ac8-8602-280b973a914b.mq.us-east-1.on.aws"
+  RABBITMQ_PORT: "5671"
+  
+  # OpenSearch
+  OPENSEARCH_HOST: "vpc-prod-comp-dev-search-lf4ult6kxxzmexenf4la7omhe4.us-east-1.es.amazonaws.com"
+  OPENSEARCH_PORT: "443"
+  
+  # AWS
+  AWS_REGION: "us-east-1"
+  NODE_ENV: "production"
